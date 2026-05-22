@@ -1,0 +1,25 @@
+[project]
+name = "cv-screener"
+version = "0.1.0"
+description = "Multi-agent CV screening system using Pydantic AI + LiteLLM + Together AI"
+requires-python = ">=3.10"
+dependencies = [
+    "pydantic-ai>=0.0.20",
+    "pydantic>=2.7",
+    "litellm>=1.50",
+    "openai>=1.40",
+    "python-dotenv>=1.0",
+    "typer>=0.12",
+    "fastapi>=0.110",
+    "uvicorn>=0.27",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cv_screener"]
+
+[project.scripts]
+cv-screener = "cv_screener.cli:app"

@@ -1,0 +1,22 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+*.egg-info/
+build/
+dist/
+
+# Project artefacts
+runs.db
+*.db
+
+# OS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
