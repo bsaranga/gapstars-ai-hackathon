@@ -16,8 +16,44 @@
     display: flex; align-items: center; gap: 12px; }
   header h1 { font-size: 16px; margin: 0; font-weight: 600; }
   header .sub { color: var(--muted); font-size: 12px; }
-  main { display: grid; grid-template-columns: 380px 1fr 360px; gap: 16px;
+  main { display: grid; grid-template-columns: 340px 1fr 360px; gap: 16px;
     padding: 16px 24px; min-height: calc(100vh - 58px); }
+  /* ---------------- runs list ---------------- */
+  .runs-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column;
+    gap: 8px; }
+  .runs-list .empty { color: var(--muted); font-style: italic; padding: 24px 8px;
+    text-align: center; font-size: 12px; }
+  .run-item { background: #0b0d12; border: 1px solid var(--border);
+    border-radius: 6px; padding: 10px 12px; cursor: pointer;
+    transition: border-color .15s, background .15s; }
+  .run-item:hover { border-color: var(--accent); }
+  .run-item.selected { border-color: var(--accent); background: #11233d; }
+  .run-item .top { display: flex; justify-content: space-between;
+    align-items: center; gap: 8px; }
+  .run-item .bug-id { font: 11px ui-monospace, monospace; color: var(--muted); }
+  .run-item .when { font-size: 11px; color: var(--muted); }
+  .run-item .summary { font-size: 13px; margin-top: 4px; line-height: 1.35;
+    color: var(--fg); display: -webkit-box; -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical; overflow: hidden; }
+  .run-item .badges { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .badge { font-size: 10px; padding: 2px 7px; border-radius: 999px;
+    background: var(--pill); color: var(--muted); text-transform: uppercase;
+    letter-spacing: .04em; font-weight: 600; }
+  .badge.running   { background: rgba(106,168,255,0.15); color: var(--accent); }
+  .badge.triaged   { background: rgba(74,222,128,0.15);  color: var(--ok); }
+  .badge.needs_info{ background: rgba(251,191,36,0.15);  color: var(--warn); }
+  .badge.failed    { background: rgba(248,113,113,0.15); color: var(--err); }
+  .badge.sev-Critical, .badge.sev-High { color: var(--err); }
+  .badge.sev-Medium { color: var(--warn); }
+  .badge.sev-Low    { color: var(--ok); }
+  .runs-header { display: flex; justify-content: space-between;
+    align-items: center; margin-bottom: 10px; }
+  .runs-header h2 { margin: 0; }
+  .runs-header .live { font-size: 10px; color: var(--accent);
+    display: flex; align-items: center; gap: 4px; }
+  .runs-header .live::before { content: ''; width: 6px; height: 6px;
+    border-radius: 50%; background: var(--accent);
+    animation: pulse 1.4s ease-in-out infinite; }
   .panel { background: var(--panel); border: 1px solid var(--border);
     border-radius: 8px; padding: 16px; display: flex; flex-direction: column;
     min-width: 0; }
@@ -144,31 +180,19 @@
 <body>
 <header>
   <h1>Bug Triage Dashboard</h1>
-  <span class="sub">paste a bug report and click any node to inspect its inputs &amp; outputs</span>
+  <span class="sub">select a run from the left, then click any node to inspect its inputs &amp; outputs</span>
+  <a href="/" style="margin-left:auto; font-size:13px; color:var(--accent); text-decoration:none;">+ New issue</a>
 </header>
 <main>
-  <!-- LEFT: input -->
+  <!-- LEFT: run history -->
   <section class="panel">
-    <h2>Bug report (markdown)</h2>
-    <textarea id="bug" placeholder="# Bug title
-
-Description...
-
-## Steps to reproduce
-1. ...
-
-## Expected
-...
-
-## Actual
-...
-
-## Environment
-- OS: macOS 14
-- Browser: Safari 17
-- App version: production v4.12
-"></textarea>
-    <button id="submit">Triage</button>
+    <div class="runs-header">
+      <h2>Runs</h2>
+      <span id="live-indicator" class="live" style="display:none;">live</span>
+    </div>
+    <div id="runs-list" class="runs-list">
+      <div class="empty">No runs yet. Submit one from the <a href="/" style="color:var(--accent);">create issue</a> view.</div>
+    </div>
   </section>
 
   <!-- MIDDLE: graph -->
@@ -320,8 +344,8 @@ Description...
 
 <script>
 const $ = (id) => document.getElementById(id);
-const $bug = $('bug'), $submit = $('submit'),
-      $outputs = $('outputs'), $inspector = $('inspector');
+const $outputs = $('outputs'), $inspector = $('inspector'),
+      $runsList = $('runs-list'), $liveIndicator = $('live-indicator');
 
 // ------- per-node captured data -------
 const data = {};   // node id -> { input, output, error, status, meta, extra }
@@ -471,8 +495,8 @@ function resetGraph() {
   });
   $outputs.innerHTML = '';
   $outputs.classList.add('hidden');
-  data.input.input = $bug.value;
-  data.input.output = $bug.value;
+  data.input.input = '';
+  data.input.output = '';
   if (selectedNode) renderInspector();
 }
 
@@ -634,18 +658,18 @@ function renderFailure(err) {
 // initial state
 resetData();
 
-$submit.addEventListener('click', async () => {
-  const raw = $bug.value.trim();
-  if (!raw) return;
-  resetGraph();
-  $submit.disabled = true;
+// ------- run history -------
+let selectedJobId = null;
+let activeReader = null;     // current AbortController for the live stream
+let liveJobId = null;        // job_id currently running on the server
 
+async function consumeStream(jobId) {
+  // Tear down any previous stream.
+  if (activeReader) { try { activeReader.abort(); } catch (_) {} }
+  const ctrl = new AbortController();
+  activeReader = ctrl;
   try {
-    const resp = await fetch('/triage', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ bug_markdown: raw }),
-    });
+    const resp = await fetch(`/triage/${jobId}/stream`, { signal: ctrl.signal });
     if (!resp.ok) {
       renderFailure(`HTTP ${resp.status}: ${await resp.text()}`);
       return;
@@ -668,11 +692,111 @@ $submit.addEventListener('click', async () => {
       }
     }
   } catch (e) {
-    renderFailure(`Client error: ${e.message}`);
+    if (e.name !== 'AbortError') renderFailure(`Client error: ${e.message}`);
   } finally {
-    $submit.disabled = false;
+    if (activeReader === ctrl) activeReader = null;
+    // Pipeline finished — refresh the runs list so denormalised
+    // fields (severity, priority, status) appear.
+    refreshRuns();
   }
-});
+}
+
+async function replayRun(jobId) {
+  if (activeReader) { try { activeReader.abort(); } catch (_) {} activeReader = null; }
+  try {
+    const r = await fetch(`/runs/${jobId}`);
+    if (!r.ok) { renderFailure(`HTTP ${r.status}`); return; }
+    const run = await r.json();
+    data.input.input  = run.bug_markdown || '';
+    data.input.output = run.bug_markdown || '';
+    if (selectedNode === 'input') renderInspector();
+    for (const ev of (run.events || [])) {
+      try { handleEvent(ev); } catch (e) { console.error('bad event', ev, e); }
+    }
+  } catch (e) {
+    renderFailure(`Client error: ${e.message}`);
+  }
+}
+
+function selectRun(jobId, opts = {}) {
+  selectedJobId = jobId;
+  // Update selection styling.
+  document.querySelectorAll('.run-item').forEach(el => {
+    el.classList.toggle('selected', el.dataset.jobId === jobId);
+  });
+  resetGraph();
+  if (jobId === liveJobId) {
+    consumeStream(jobId);
+  } else {
+    replayRun(jobId);
+  }
+}
+
+function fmtTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts * 1000);
+  const today = new Date();
+  const isToday = d.toDateString() === today.toDateString();
+  const opts = isToday ? { hour: '2-digit', minute: '2-digit' }
+                       : { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+  return d.toLocaleString(undefined, opts);
+}
+
+function renderRunsList(runs) {
+  if (!runs.length) {
+    $runsList.innerHTML = '<div class="empty">No runs yet. Submit one from the <a href="/" style="color:var(--accent);">create issue</a> view.</div>';
+    return;
+  }
+  $runsList.innerHTML = runs.map(r => {
+    const status = r.job_id === liveJobId && r.status === 'running' ? 'running' : r.status;
+    const badges = [`<span class="badge ${status}">${status.replace('_', ' ')}</span>`];
+    if (r.severity) badges.push(`<span class="badge sev-${r.severity}">${r.severity}</span>`);
+    if (r.priority) badges.push(`<span class="badge">${r.priority}</span>`);
+    const summary = r.summary || (status === 'running' ? 'Triage in progress…' : '(no summary)');
+    return `<div class="run-item ${r.job_id === selectedJobId ? 'selected' : ''}"
+                 data-job-id="${escapeHtml(r.job_id)}">
+      <div class="top">
+        <span class="bug-id">${escapeHtml(r.bug_id || r.job_id.slice(0, 8))}</span>
+        <span class="when">${escapeHtml(fmtTime(r.started_at))}</span>
+      </div>
+      <div class="summary">${escapeHtml(summary)}</div>
+      <div class="badges">${badges.join('')}</div>
+    </div>`;
+  }).join('');
+  $runsList.querySelectorAll('.run-item').forEach(el => {
+    el.addEventListener('click', () => selectRun(el.dataset.jobId));
+  });
+}
+
+async function refreshRuns({ autoSelect = false } = {}) {
+  let payload;
+  try {
+    const r = await fetch('/runs');
+    if (!r.ok) return;
+    payload = await r.json();
+  } catch (_) { return; }
+
+  const prevLive = liveJobId;
+  liveJobId = payload.current_job_id || null;
+  const runs = payload.runs || [];
+  // Live indicator if the active job is still running.
+  const liveRun = runs.find(r => r.job_id === liveJobId);
+  $liveIndicator.style.display = (liveRun && liveRun.status === 'running') ? 'flex' : 'none';
+
+  renderRunsList(runs);
+
+  if (autoSelect && runs.length && !selectedJobId) {
+    const target = liveRun || runs[0];
+    selectRun(target.job_id);
+  } else if (liveJobId && liveJobId !== prevLive) {
+    // A new job started somewhere else (e.g. from `/`). Auto-attach.
+    selectRun(liveJobId);
+  }
+}
+
+// Poll the list periodically so runs created from `/` appear here.
+refreshRuns({ autoSelect: true });
+setInterval(refreshRuns, 3000);
 </script>
 </body>
 </html>

@@ -270,11 +270,24 @@
       }
     }
 
+    // ===== Per-tab continuity =====
+    // Remember which run this tab is currently viewing so navigating
+    // away to /dashboard and back restores the same progress/summary
+    // view instead of dropping back to the empty form.
+    const TAB_KEY = 'bt.viewedJobId';
+    const rememberJob = (id) => { try { sessionStorage.setItem(TAB_KEY, id); } catch (_) {} };
+    const forgetJob   = ()   => { try { sessionStorage.removeItem(TAB_KEY); } catch (_) {} };
+    const recalledJob = ()   => { try { return sessionStorage.getItem(TAB_KEY); } catch (_) { return null; } };
+
     document.getElementById('back-btn').addEventListener('click', () => {
       document.getElementById('markdown-report').value = '';
+      forgetJob();
       showView('add');
     });
-    document.getElementById('nav-new').addEventListener('click', () => showView('add'));
+    document.getElementById('nav-new').addEventListener('click', () => {
+      forgetJob();
+      showView('add');
+    });
 
     // ===== Agent step definitions (matches pipeline_events.py event stream) =====
     const AGENT_STEPS = [
@@ -476,25 +489,17 @@
       artifact: 'Artifact Generator drafting Jira ticket and tests…',
     };
 
-    document.getElementById('bug-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const md = document.getElementById('markdown-report').value.trim();
-      if (!md) return;
-
+    // ===== Streaming via shared job store =====
+    async function consumeStream(jobId) {
       renderSteps();
-      setProgress(5, 'Initiating intelligent diagnostic workflow…');
+      setProgress(5, 'Connecting to triage job…');
       showView('progress');
 
       let buf = '';
       let finalReport = null;
       try {
-        const resp = await fetch('/triage', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ bug_markdown: md }),
-        });
+        const resp = await fetch(`/triage/${jobId}/stream`);
         if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`);
-
         const reader = resp.body.getReader();
         const dec = new TextDecoder();
         while (true) {
@@ -522,7 +527,52 @@
         renderFinal(finalReport);
         setTimeout(() => showView('summary'), 600);
       }
+    }
+
+    document.getElementById('bug-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const md = document.getElementById('markdown-report').value.trim();
+      if (!md) return;
+
+      let jobId;
+      try {
+        const r = await fetch('/triage', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ bug_markdown: md }),
+        });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        jobId = (await r.json()).job_id;
+      } catch (err) {
+        alert('Failed to start triage: ' + err.message);
+        return;
+      }
+      rememberJob(jobId);
+      consumeStream(jobId);
     });
+
+    // On load:
+    //   1. If this tab was already viewing a run, re-attach to it.
+    //      `consumeStream` works for both live and finished runs (the
+    //      server falls back to DB replay for jobs no longer in memory).
+    //   2. Otherwise, if a different tab has a triage in flight, attach
+    //      to that so the user lands directly on the progress view.
+    //   3. Otherwise, stay on the form.
+    (async () => {
+      const recalled = recalledJob();
+      if (recalled) {
+        consumeStream(recalled);
+        return;
+      }
+      try {
+        const r = await fetch('/triage/current');
+        if (!r.ok) return;
+        const { job_id } = await r.json();
+        if (!job_id) return;
+        rememberJob(job_id);
+        consumeStream(job_id);
+      } catch (_) { /* no job, stay on add view */ }
+    })();
 
     function handleEvent(ev) {
       switch (ev.type) {
