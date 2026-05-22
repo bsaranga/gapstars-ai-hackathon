@@ -32,15 +32,15 @@ triage_agent = make_agent(
 def get_team_members(
     ctx: RunContext[TriageDeps],
     team_id: str,
-    include_unavailable: bool = False,
 ) -> list[DeveloperSummary]:
     """Return developers on `team_id`.
 
-    By default, developers with availability == "out" are excluded.
-    Raises TeamNotFound if the team_id is unknown.
+    Developers with `availability == "out"` are always excluded — the
+    agent has no need to see them. Raises TeamNotFound if the team_id
+    is unknown.
     """
     try:
-        return get_team_members_impl(ctx.deps, team_id, include_unavailable)
+        return get_team_members_impl(ctx.deps, team_id, include_unavailable=False)
     except TeamNotFound as e:
         raise ValueError(str(e)) from e
 
