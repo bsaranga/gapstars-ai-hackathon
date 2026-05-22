@@ -1,0 +1,1324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IssueTrack — Bug Triage</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background:#d1d5db; border-radius:10px; }
+    .form-container { animation: slideUp .3s ease-out; }
+    @keyframes slideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes progress-shimmer { 0% { transform:translateX(-100%); } 100% { transform:translateX(100%); } }
+    .animate-shimmer { animation: progress-shimmer 2s infinite linear; }
+    @keyframes pulse-ring { 0%,100% { opacity:1; } 50% { opacity:.5; } }
+    .step-pulse { animation: pulse-ring 2s cubic-bezier(.4,0,.6,1) infinite; }
+    .severity-strip { width:4px; height:100%; position:absolute; left:0; top:0; }
+    .hidden-view { display:none; }
+  </style>
+</head>
+
+<body class="bg-slate-50 text-slate-900 min-h-screen">
+
+  <!-- Top navigation -->
+  <header class="fixed top-0 inset-x-0 z-50 h-14 bg-white border-b border-slate-200">
+    <div class="mx-auto flex h-full w-full max-w-7xl items-center justify-between px-6">
+      <div class="flex items-center gap-8">
+        <span class="text-xl font-extrabold tracking-tight text-blue-700">IssueTrack</span>
+        <nav class="hidden md:flex items-center gap-6 h-full">
+          <a id="nav-projects" href="#projects" class="nav-link flex items-center h-full px-2 text-sm font-semibold text-slate-600 hover:text-slate-900 transition">Projects</a>
+          <a id="nav-issues"   href="#backlog"  class="nav-link flex items-center h-full px-2 text-sm font-semibold text-slate-600 hover:text-slate-900 transition">Issues</a>
+        </nav>
+      </div>
+      <div class="flex items-center gap-3">
+        <button id="nav-new" class="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 transition">Create</button>
+        <button id="logout-btn"
+                class="rounded-md border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-100 transition"
+                title="Sign out">
+          Sign out
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Side navigation -->
+  <aside class="fixed left-0 top-14 hidden md:flex h-[calc(100vh-3.5rem)] w-60 flex-col gap-1 border-r border-slate-200 bg-white p-4">
+    <button id="active-project-card"
+            class="mb-4 flex w-full items-center gap-3 rounded-md p-2 text-left hover:bg-slate-100 transition"
+            title="Switch project">
+      <div id="active-project-key"
+           class="flex h-8 w-8 items-center justify-center rounded bg-slate-300 font-bold text-white">—</div>
+      <div class="min-w-0">
+        <h3 id="active-project-name" class="truncate text-base font-semibold leading-tight">No project</h3>
+        <p class="text-xs text-slate-500">Click to switch</p>
+      </div>
+    </button>
+    <nav class="flex flex-col gap-1">
+      <a id="side-backlog" href="#backlog" class="side-link flex items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"><span class="material-symbols-outlined">list</span><span>Backlog</span></a>
+      <a id="side-create"  href="#create"  class="side-link flex items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"><span class="material-symbols-outlined">add_circle</span><span>Triage New</span></a>
+      <a id="side-projects" href="#projects" class="side-link flex items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"><span class="material-symbols-outlined">folder</span><span>Projects</span></a>
+      <a href="/dashboard" class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"><span class="material-symbols-outlined">analytics</span><span>Pipeline View</span></a>
+    </nav>
+  </aside>
+
+  <main class="md:ml-60 pt-14">
+
+    <!-- ============ VIEW 1: ADD ISSUE ============ -->
+    <section id="view-add" class="custom-scrollbar">
+      <div class="mx-auto max-w-3xl px-6 py-8">
+        <div class="mb-6">
+          <div class="mb-2 flex items-center gap-1 text-xs font-semibold text-slate-500">
+            <a href="#projects" class="hover:text-slate-700">Projects</a>
+            <span class="material-symbols-outlined text-[14px]">chevron_right</span>
+            <span id="add-breadcrumb-project">—</span>
+            <span class="material-symbols-outlined text-[14px]">chevron_right</span>
+            <span class="font-bold text-blue-700">Create Bug</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <h1 class="text-2xl font-semibold text-slate-900">Create Bug Report</h1>
+            <p class="text-xs text-slate-500">Paste a raw markdown bug report — agents handle the rest.</p>
+          </div>
+        </div>
+
+        <div id="no-project-banner"
+             class="mb-4 hidden rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          You need to <a href="#projects" class="font-semibold underline">create or select a project</a> before triaging an issue.
+        </div>
+
+        <div class="form-container rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <form id="bug-form" class="space-y-6">
+            <fieldset class="border-b border-slate-200 pb-4">
+              <legend class="mb-1.5 block text-xs font-semibold text-slate-500">Project</legend>
+              <div class="flex w-fit items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                <div id="add-form-project-key"
+                     class="flex h-5 w-5 items-center justify-center rounded bg-slate-300 text-[10px] font-bold text-white">—</div>
+                <span id="add-form-project-name" class="text-sm text-slate-900">No project selected</span>
+              </div>
+            </fieldset>
+
+            <div class="space-y-1.5">
+              <label for="markdown-report" class="block text-xs font-semibold text-slate-500">Paste Bug Report (Markdown)</label>
+              <textarea id="markdown-report" required
+                placeholder="# Title&#10;&#10;## Description&#10;...&#10;&#10;## Steps to reproduce&#10;1. ..."
+                class="min-h-[400px] w-full rounded-lg border border-slate-200 bg-white px-4 py-4 font-mono text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-600"></textarea>
+            </div>
+
+            <div class="flex items-center justify-end border-t border-slate-200 pt-6">
+              <button id="submit-btn" type="submit"
+                class="rounded-md bg-blue-600 px-8 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-600/20 hover:bg-blue-700 transition">
+                Triage Issue
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ VIEW 2: AGENT PROGRESS ============ -->
+    <section id="view-progress" class="hidden-view">
+      <div class="relative flex min-h-[calc(100vh-3.5rem)] items-center justify-center overflow-hidden p-4">
+        <div class="pointer-events-none absolute inset-0 z-0 opacity-[0.03]"
+             style="background-image:radial-gradient(#0052cc 1px, transparent 1px); background-size:24px 24px;"></div>
+        <div class="absolute -bottom-24 -right-24 -z-10 h-96 w-96 rounded-full bg-blue-200/40 blur-3xl"></div>
+        <div class="absolute -top-24 -left-24 -z-10 h-96 w-96 rounded-full bg-blue-100/60 blur-3xl"></div>
+
+        <div class="relative z-10 w-full max-w-2xl overflow-hidden rounded-xl border border-slate-200 bg-white p-8 shadow-lg">
+          <div class="mb-8 text-center">
+            <div id="progress-icon-wrap" class="relative mb-6 inline-flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 text-blue-700">
+              <span id="progress-icon" class="material-symbols-outlined animate-spin text-[32px]" style="animation-duration:3000ms;">sync</span>
+            </div>
+            <h1 id="progress-title" class="mb-1 text-2xl font-semibold text-slate-900">Processing Bug Report</h1>
+            <p id="status-message" class="mx-auto max-w-md text-sm text-slate-500">Initiating intelligent diagnostic workflow…</p>
+            <div id="missing-info-box" class="hidden mx-auto mt-4 max-w-md rounded-lg border border-amber-300 bg-amber-50 p-4 text-left text-amber-900">
+              <p class="mb-2 flex items-center gap-2 text-xs font-semibold uppercase">
+                <span class="material-symbols-outlined text-[18px]">warning</span> Triage short-circuited — missing information
+              </p>
+              <p class="mb-3 text-xs text-amber-800">
+                The analyser could not proceed because the bug report is missing
+                fields it needs to assign severity / priority. No triage was performed.
+              </p>
+              <ul id="missing-info-list" class="space-y-1 text-sm pl-1"></ul>
+              <div class="mt-4 flex justify-end">
+                <button id="edit-resubmit-btn"
+                  class="rounded-md bg-amber-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-amber-700">
+                  Edit &amp; Resubmit
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="relative mb-8 h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+            <div id="main-progress-bar" class="h-full bg-blue-600 transition-all duration-700 ease-in-out" style="width:5%"></div>
+            <div class="animate-shimmer absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
+          </div>
+
+          <div class="grid grid-cols-1 gap-4" id="steps">
+            <!-- Steps injected by JS -->
+          </div>
+
+          <div class="mt-8 text-center">
+            <p class="flex items-center justify-center gap-1 text-xs text-slate-500">
+              <span class="material-symbols-outlined text-[14px]">info</span>
+              This process usually takes 10–30 seconds. Please do not close the window.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ VIEW 3: BUG SUMMARY ============ -->
+    <section id="view-summary" class="hidden-view">
+      <div class="mx-auto max-w-5xl p-6">
+        <header class="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+          <div>
+            <span id="r-bug-id" class="mb-2 inline-block rounded bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700">BUG-—</span>
+            <h1 class="text-3xl font-semibold tracking-tight text-slate-900">Bug Triage Results</h1>
+            <p class="mt-1 text-sm text-slate-500">AI-powered analysis complete. Review and confirm the generated issue details.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="back-btn" class="rounded-md bg-slate-100 px-6 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-200">Triage Another</button>
+            <button id="confirm-create-btn" class="rounded-md bg-blue-600 px-6 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">Confirm &amp; Create Issue</button>
+          </div>
+        </header>
+
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-12">
+          <div class="space-y-6 md:col-span-8">
+            <section class="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-6">
+              <div id="r-severity-strip" class="severity-strip bg-slate-300"></div>
+              <div class="mb-2 flex items-start justify-between">
+                <span class="rounded bg-blue-100 px-2 py-1 text-xs font-semibold uppercase tracking-wider text-blue-700">Bug Summary</span>
+                <span id="r-status" class="text-xs text-slate-500">—</span>
+              </div>
+              <h2 id="r-summary" class="mb-4 text-2xl font-bold leading-tight text-slate-900">—</h2>
+            </section>
+
+            <section class="rounded-xl border border-slate-200 bg-white p-6">
+              <h3 class="mb-6 flex items-center gap-2 text-base font-semibold text-slate-900">
+                <span class="material-symbols-outlined text-blue-600">rebase_edit</span>
+                Suggested Reproduction Steps
+              </h3>
+              <div id="r-repro" class="space-y-4"></div>
+            </section>
+
+            <section class="relative overflow-hidden rounded-xl bg-blue-600 p-6 text-white shadow-lg">
+              <div class="pointer-events-none absolute right-0 top-0 p-6 opacity-10">
+                <span class="material-symbols-outlined text-[120px]">auto_awesome</span>
+              </div>
+              <div class="relative z-10">
+                <h3 class="mb-2 flex items-center gap-2 text-lg font-semibold">
+                  <span class="material-symbols-outlined">smart_toy</span> Triage Recommendation
+                </h3>
+                <p id="r-recommendation" class="text-sm leading-relaxed text-blue-50">—</p>
+              </div>
+            </section>
+
+            <section id="r-artifacts-section" class="rounded-xl border border-slate-200 bg-white p-6 hidden">
+              <h3 class="mb-4 text-base font-semibold text-slate-900">Generated Artifacts</h3>
+              <div class="space-y-4 text-sm">
+                <div>
+                  <p class="text-xs font-semibold uppercase text-slate-500 mb-1">Jira Ticket</p>
+                  <pre id="r-jira" class="whitespace-pre-wrap rounded-lg border border-slate-100 bg-slate-50 p-3 font-mono text-xs"></pre>
+                </div>
+                <div>
+                  <p class="text-xs font-semibold uppercase text-slate-500 mb-1">Test Cases</p>
+                  <ul id="r-tests" class="list-disc pl-5 space-y-1 text-slate-700"></ul>
+                </div>
+                <div>
+                  <p class="text-xs font-semibold uppercase text-slate-500 mb-1">Handoff Note</p>
+                  <p id="r-handoff" class="text-slate-700"></p>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div class="space-y-4 md:col-span-4">
+            <section class="rounded-xl border border-slate-200 bg-white p-6">
+              <h3 class="mb-4 text-xs font-semibold uppercase text-slate-500">Triage Metadata</h3>
+              <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                  <span class="text-sm text-slate-600">Severity</span>
+                  <span id="r-severity" class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">—</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-sm text-slate-600">Priority</span>
+                  <span id="r-priority" class="rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-700">—</span>
+                </div>
+              </div>
+
+              <div class="mt-6 border-t border-slate-200 pt-4">
+                <p class="mb-3 text-xs text-slate-500">Suggested Team &amp; Assignee</p>
+                <div class="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                  <p id="r-assignee" class="text-base font-semibold text-slate-900">—</p>
+                  <div class="mt-1 flex items-center gap-1 text-blue-600">
+                    <span class="material-symbols-outlined text-[14px]">groups</span>
+                    <span id="r-team" class="text-xs font-semibold uppercase">—</span>
+                  </div>
+                  <p id="r-assignee-reason" class="mt-2 text-xs text-slate-500"></p>
+                </div>
+              </div>
+            </section>
+
+            <section id="r-missing-section" class="rounded-xl border border-amber-300 bg-amber-50 p-6 text-amber-900 hidden">
+              <h3 class="mb-2 flex items-center gap-2 text-xs font-semibold uppercase">
+                <span class="material-symbols-outlined text-[18px]">warning</span> Missing Information
+              </h3>
+              <ul id="r-missing" class="space-y-2 text-sm"></ul>
+            </section>
+
+            <section id="r-notify-section" class="rounded-xl border border-slate-200 bg-white p-6 hidden">
+              <h3 class="mb-3 text-xs font-semibold uppercase text-slate-500">Stakeholders to Notify</h3>
+              <ul id="r-notify" class="space-y-2 text-sm text-slate-700"></ul>
+            </section>
+
+            <!-- Chat widget: ask questions grounded in this run -->
+            <section class="rounded-xl border border-slate-200 bg-white p-4 flex flex-col" style="min-height:340px; max-height:520px;">
+              <h3 class="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-500">
+                <span class="material-symbols-outlined text-[18px] text-blue-600">forum</span>
+                Ask about this run
+              </h3>
+              <div id="chat-log" class="flex-1 overflow-y-auto space-y-2 px-1 py-1 text-sm">
+                <p class="text-xs italic text-slate-400">Ask why this severity was chosen, who was assigned, or what evidence the analyser used.</p>
+              </div>
+              <form id="chat-form" class="mt-3 flex gap-2">
+                <input id="chat-input" type="text" maxlength="500" autocomplete="off"
+                       placeholder="Ask a question about this run…"
+                       class="flex-1 rounded-md border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
+                <button id="chat-send" type="submit"
+                        class="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
+                  Send
+                </button>
+              </form>
+            </section>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ VIEW 4: PROJECTS ============ -->
+    <section id="view-projects" class="hidden-view">
+      <div class="mx-auto max-w-4xl px-6 py-8">
+        <header class="mb-6 flex items-end justify-between">
+          <div>
+            <h1 class="text-2xl font-semibold text-slate-900">Projects</h1>
+            <p class="mt-1 text-sm text-slate-500">Create a project and select it to scope triage runs.</p>
+          </div>
+        </header>
+
+        <div class="form-container rounded-xl border border-slate-200 bg-white p-6 shadow-sm mb-6">
+          <form id="project-form" class="space-y-4">
+            <h2 class="text-base font-semibold text-slate-900">New Project</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div class="md:col-span-2 space-y-1">
+                <label class="block text-xs font-semibold text-slate-500" for="proj-name">Name</label>
+                <input id="proj-name" type="text" required maxlength="80"
+                       placeholder="Cloud Infrastructure"
+                       class="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
+              </div>
+              <div class="space-y-1">
+                <label class="block text-xs font-semibold text-slate-500" for="proj-key">Key (optional)</label>
+                <input id="proj-key" type="text" maxlength="4" placeholder="auto"
+                       class="w-full uppercase rounded-md border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
+              </div>
+            </div>
+            <div class="space-y-1">
+              <label class="block text-xs font-semibold text-slate-500" for="proj-desc">Description</label>
+              <textarea id="proj-desc" rows="2"
+                        class="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"></textarea>
+            </div>
+            <div id="project-form-error" class="hidden text-sm text-red-600"></div>
+            <div class="flex justify-end">
+              <button type="submit"
+                      class="rounded-md bg-blue-600 px-6 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+                Create Project
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <h2 class="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">All Projects</h2>
+        <div id="projects-list" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div class="empty col-span-full rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
+            No projects yet — create one above.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ VIEW 5: BACKLOG ============ -->
+    <section id="view-backlog" class="hidden-view">
+      <div class="mx-auto max-w-6xl px-6 py-8">
+        <header class="mb-6 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div>
+            <div class="mb-1 flex items-center gap-1 text-xs font-semibold text-slate-500">
+              <a href="#projects" class="hover:text-slate-700">Projects</a>
+              <span class="material-symbols-outlined text-[14px]">chevron_right</span>
+              <span id="backlog-breadcrumb-project">—</span>
+              <span class="material-symbols-outlined text-[14px]">chevron_right</span>
+              <span class="font-bold text-blue-700">Backlog</span>
+            </div>
+            <h1 class="text-2xl font-semibold text-slate-900">Backlog</h1>
+            <p class="mt-1 text-sm text-slate-500">Triaged issues created in this project.</p>
+          </div>
+          <button id="backlog-new-btn"
+                  class="rounded-md bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+            + Triage New Issue
+          </button>
+        </header>
+
+        <div id="backlog-empty"
+             class="hidden rounded-lg border border-dashed border-slate-300 bg-white p-12 text-center">
+          <span class="material-symbols-outlined text-[40px] text-slate-300">inbox</span>
+          <p class="mt-2 text-sm text-slate-500">No issues yet. Triage a bug and confirm it to populate the backlog.</p>
+        </div>
+
+        <div id="backlog-table-wrap" class="hidden overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-slate-50 text-xs uppercase text-slate-500">
+              <tr>
+                <th class="px-4 py-3 font-semibold">Key</th>
+                <th class="px-4 py-3 font-semibold">Title</th>
+                <th class="px-4 py-3 font-semibold">Severity</th>
+                <th class="px-4 py-3 font-semibold">Priority</th>
+                <th class="px-4 py-3 font-semibold">Team</th>
+                <th class="px-4 py-3 font-semibold">Assignee</th>
+                <th class="px-4 py-3 font-semibold">Created</th>
+              </tr>
+            </thead>
+            <tbody id="backlog-rows" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // ===== View switching =====
+    const views = {
+      add:      document.getElementById('view-add'),
+      progress: document.getElementById('view-progress'),
+      summary:  document.getElementById('view-summary'),
+      projects: document.getElementById('view-projects'),
+      backlog:  document.getElementById('view-backlog'),
+    };
+    // Sidebar / top-nav links → view they switch to (used to highlight active).
+    const NAV_FOR_VIEW = {
+      projects: ['nav-projects', 'side-projects'],
+      backlog:  ['nav-issues',   'side-backlog'],
+      add:      ['side-create'],
+      progress: ['side-create'],
+      summary:  ['side-create'],
+    };
+    function showView(name) {
+      for (const [k, el] of Object.entries(views)) {
+        el.classList.toggle('hidden-view', k !== name);
+      }
+      // Highlight active nav links.
+      document.querySelectorAll('.nav-link').forEach(el => {
+        el.classList.remove('text-blue-700','border-b-2','border-blue-700');
+        el.classList.add('text-slate-600');
+      });
+      document.querySelectorAll('.side-link').forEach(el => {
+        el.classList.remove('bg-blue-100','text-blue-800','font-bold');
+        el.classList.add('text-slate-600','font-semibold');
+      });
+      (NAV_FOR_VIEW[name] || []).forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (el.classList.contains('nav-link')) {
+          el.classList.remove('text-slate-600');
+          el.classList.add('text-blue-700','border-b-2','border-blue-700');
+        } else {
+          el.classList.remove('text-slate-600','font-semibold');
+          el.classList.add('bg-blue-100','text-blue-800','font-bold');
+        }
+      });
+      // Refresh view-specific data.
+      if (name === 'projects') refreshProjects();
+      if (name === 'backlog')  refreshBacklog();
+    }
+
+    // ===== Per-tab continuity =====
+    // Remember which run this tab is currently viewing so navigating
+    // away to /dashboard and back restores the same progress/summary
+    // view instead of dropping back to the empty form.
+    const TAB_KEY = 'bt.viewedJobId';
+    const rememberJob = (id) => { try { sessionStorage.setItem(TAB_KEY, id); } catch (_) {} };
+    const forgetJob   = ()   => { try { sessionStorage.removeItem(TAB_KEY); } catch (_) {} };
+    const recalledJob = ()   => { try { return sessionStorage.getItem(TAB_KEY); } catch (_) { return null; } };
+
+    document.getElementById('back-btn').addEventListener('click', () => {
+      const btn = document.getElementById('back-btn');
+      if (btn.dataset.mode === 'backlog') {
+        // Coming from "open issue from backlog" — restore default summary
+        // controls and go back to the backlog list.
+        document.getElementById('confirm-create-btn').classList.remove('hidden');
+        btn.textContent = 'Triage Another';
+        delete btn.dataset.mode;
+        showView('backlog');
+        return;
+      }
+      document.getElementById('markdown-report').value = '';
+      forgetJob();
+      showView('add');
+    });
+    document.getElementById('nav-new').addEventListener('click', () => {
+      forgetJob();
+      showView('add');
+    });
+
+    // ===== Agent step definitions (matches pipeline_events.py event stream) =====
+    const AGENT_STEPS = [
+      { key: 'parser',   label: 'Bug Parser',        icon: 'description',           desc: 'Extracting structured fields from raw markdown.' },
+      { key: 'analyzer', label: 'Bug Analyser',      icon: 'troubleshoot',          desc: 'Summarising, classifying area, checking completeness.' },
+      { key: 'triage',   label: 'Triage Agent',      icon: 'assignment_turned_in',  desc: 'Picking severity, priority, and assignee.' },
+      { key: 'artifact', label: 'Artifact Generator',icon: 'auto_awesome',          desc: 'Drafting Jira ticket, test cases, handoff note.' },
+    ];
+
+    function renderSteps() {
+      const root = document.getElementById('steps');
+      root.innerHTML = '';
+      AGENT_STEPS.forEach((s, i) => {
+        const div = document.createElement('div');
+        div.id = `step-${s.key}`;
+        div.className = 'flex items-center gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4 opacity-60 transition-all duration-300';
+        div.innerHTML = `
+          <div class="relative">
+            <div class="step-icon relative z-10 flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-500">
+              <span class="material-symbols-outlined text-[20px]">${s.icon}</span>
+            </div>
+          </div>
+          <div class="flex-1">
+            <div class="mb-1 flex items-center justify-between">
+              <span class="text-base font-semibold text-slate-900">${s.label}</span>
+              <span id="badge-${s.key}" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Waiting</span>
+            </div>
+            <p class="text-sm text-slate-500">${s.desc}</p>
+          </div>`;
+        root.appendChild(div);
+      });
+    }
+
+    function setActive(key) {
+      const el = document.getElementById(`step-${key}`);
+      if (!el) return;
+      el.classList.remove('bg-slate-50','border-slate-200','opacity-60','bg-white');
+      el.classList.add('bg-blue-50','border-blue-200');
+      const icon = el.querySelector('.step-icon');
+      icon.classList.remove('bg-slate-200','text-slate-500','bg-emerald-600');
+      icon.classList.add('bg-blue-600','text-white');
+
+      const iconWrap = icon.parentNode;
+      if (!iconWrap.querySelector('.step-pulse')) {
+        const pulse = document.createElement('div');
+        pulse.className = 'step-pulse absolute -inset-1 rounded-full bg-blue-200';
+        iconWrap.appendChild(pulse);
+      }
+      const badge = document.getElementById(`badge-${key}`);
+      badge.innerText = 'In Progress';
+      badge.classList.remove('text-slate-500','text-emerald-600','text-red-600');
+      badge.classList.add('text-blue-600');
+    }
+
+    function setComplete(key) {
+      const el = document.getElementById(`step-${key}`);
+      if (!el) return;
+      el.classList.remove('bg-blue-50','border-blue-200','opacity-60');
+      el.classList.add('bg-white','border-slate-200');
+      const icon = el.querySelector('.step-icon');
+      icon.classList.remove('bg-blue-600','bg-slate-200','text-slate-500');
+      icon.classList.add('bg-emerald-600','text-white');
+      icon.innerHTML = '<span class="material-symbols-outlined text-[20px]">check</span>';
+      const pulse = el.querySelector('.step-pulse');
+      if (pulse) pulse.remove();
+      const badge = document.getElementById(`badge-${key}`);
+      badge.innerText = 'Completed';
+      badge.classList.remove('text-blue-600','text-slate-500','text-red-600');
+      badge.classList.add('text-emerald-600');
+    }
+
+    function setSkipped(key) {
+      const el = document.getElementById(`step-${key}`);
+      if (!el) return;
+      el.classList.remove('bg-blue-50','border-blue-200','bg-slate-50','bg-white');
+      el.classList.add('bg-slate-100','border-slate-200','opacity-50');
+      const icon = el.querySelector('.step-icon');
+      icon.classList.remove('bg-blue-600','bg-emerald-600','bg-red-600');
+      icon.classList.add('bg-slate-300','text-slate-500');
+      icon.innerHTML = '<span class="material-symbols-outlined text-[20px]">do_not_disturb_on</span>';
+      const pulse = el.querySelector('.step-pulse');
+      if (pulse) pulse.remove();
+      const badge = document.getElementById(`badge-${key}`);
+      badge.innerText = 'Skipped';
+      badge.classList.remove('text-blue-600','text-emerald-600','text-red-600');
+      badge.classList.add('text-slate-500');
+    }
+
+    function setFailed(key) {
+      const el = document.getElementById(`step-${key}`);
+      if (!el) return;
+      el.classList.remove('bg-blue-50','border-blue-200','opacity-60','bg-slate-50');
+      el.classList.add('bg-red-50','border-red-200');
+      const icon = el.querySelector('.step-icon');
+      icon.classList.remove('bg-blue-600','bg-slate-200','bg-emerald-600','text-slate-500');
+      icon.classList.add('bg-red-600','text-white');
+      icon.innerHTML = '<span class="material-symbols-outlined text-[20px]">error</span>';
+      const pulse = el.querySelector('.step-pulse');
+      if (pulse) pulse.remove();
+      const badge = document.getElementById(`badge-${key}`);
+      badge.innerText = 'Failed';
+      badge.classList.remove('text-blue-600','text-emerald-600','text-slate-500');
+      badge.classList.add('text-red-600');
+    }
+
+    function setProgress(pct, msg) {
+      document.getElementById('main-progress-bar').style.width = pct + '%';
+      if (msg) document.getElementById('status-message').innerText = msg;
+    }
+
+    // ===== Render final report =====
+    const SEV_STRIP = { Critical: 'bg-red-700', High: 'bg-red-600', Medium: 'bg-amber-500', Low: 'bg-emerald-500' };
+    const SEV_PILL  = {
+      Critical: 'bg-red-100 text-red-800', High: 'bg-red-100 text-red-700',
+      Medium: 'bg-amber-100 text-amber-800', Low: 'bg-emerald-100 text-emerald-800',
+    };
+    const PRI_PILL = {
+      P0: 'bg-red-600 text-white', P1: 'bg-orange-600 text-white',
+      P2: 'bg-amber-500 text-white', P3: 'bg-slate-400 text-white',
+    };
+
+    function renderFinal(final) {
+      document.getElementById('r-bug-id').innerText = final.bug_id || '—';
+      document.getElementById('r-summary').innerText = final.summary || '—';
+      document.getElementById('r-status').innerText = final.status || '—';
+
+      const stripCls = SEV_STRIP[final.severity] || 'bg-slate-300';
+      document.getElementById('r-severity-strip').className = 'severity-strip ' + stripCls;
+
+      const sev = document.getElementById('r-severity');
+      sev.innerText = final.severity || '—';
+      sev.className = 'rounded-full px-3 py-1 text-xs font-semibold ' + (SEV_PILL[final.severity] || 'bg-slate-100 text-slate-700');
+
+      const pri = document.getElementById('r-priority');
+      pri.innerText = final.priority || '—';
+      pri.className = 'rounded-full px-3 py-1 text-xs font-semibold ' + (PRI_PILL[final.priority] || 'bg-slate-200 text-slate-700');
+
+
+      // Repro steps
+      const repro = document.getElementById('r-repro');
+      const steps = final.suggested_repro_steps || [];
+      if (steps.length === 0) {
+        repro.innerHTML = '<p class="text-sm text-slate-500">No reproduction steps suggested.</p>';
+      } else {
+        repro.innerHTML = steps.map((s, i) => `
+          <div class="flex gap-4 rounded-lg border border-slate-100 bg-slate-50 p-4">
+            <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 font-bold text-white">${i+1}</div>
+            <div class="text-sm text-slate-700">${escapeHtml(s)}</div>
+          </div>`).join('');
+      }
+
+      // Recommendation
+      document.getElementById('r-recommendation').innerText =
+        final.triage_recommendation || final.rationale || 'No recommendation produced.';
+
+      // Assignee / team
+      if (final.suggested_assignee) {
+        document.getElementById('r-assignee').innerText = final.suggested_assignee.name || '—';
+        document.getElementById('r-assignee-reason').innerText = final.suggested_assignee.reason || '';
+      } else {
+        document.getElementById('r-assignee').innerText = '—';
+        document.getElementById('r-assignee-reason').innerText = '';
+      }
+      document.getElementById('r-team').innerText = final.suggested_owner_team || '—';
+
+      // Missing info
+      const miss = (final.missing_information || []).concat(final.blocking_fields || []);
+      const missSection = document.getElementById('r-missing-section');
+      if (miss.length) {
+        missSection.classList.remove('hidden');
+        document.getElementById('r-missing').innerHTML = miss.map(m =>
+          `<li class="flex items-start gap-2"><span class="material-symbols-outlined mt-1 text-[8px]">circle</span><span>${escapeHtml(m)}</span></li>`
+        ).join('');
+      } else {
+        missSection.classList.add('hidden');
+      }
+
+      // Notify
+      const notify = final.notify || [];
+      const notifySection = document.getElementById('r-notify-section');
+      if (notify.length) {
+        notifySection.classList.remove('hidden');
+        document.getElementById('r-notify').innerHTML = notify.map(n =>
+          `<li class="flex items-center justify-between"><span>${escapeHtml(n.name)}</span><span class="text-xs text-slate-500">${escapeHtml(n.role)}</span></li>`
+        ).join('');
+      } else {
+        notifySection.classList.add('hidden');
+      }
+
+      // Artifacts
+      const art = final.artifacts;
+      const artSection = document.getElementById('r-artifacts-section');
+      if (art) {
+        artSection.classList.remove('hidden');
+        document.getElementById('r-jira').innerText = art.jira_ticket || '';
+        document.getElementById('r-tests').innerHTML = (art.test_cases || []).map(t => `<li>${escapeHtml(t)}</li>`).join('');
+        document.getElementById('r-handoff').innerText = art.handoff_note || '';
+      } else {
+        artSection.classList.add('hidden');
+      }
+    }
+
+    function escapeHtml(s) {
+      return String(s ?? '').replace(/[&<>"']/g, c => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+      }[c]));
+    }
+
+    // ===== Streaming submit =====
+    const PROGRESS_BY_AGENT = { parser: 25, analyzer: 50, triage: 75, artifact: 95 };
+    const START_MSG = {
+      parser:   'Bug Parser extracting structured fields…',
+      analyzer: 'Bug Analyser summarising and checking completeness…',
+      triage:   'Triage Agent selecting severity, priority, assignee…',
+      artifact: 'Artifact Generator drafting Jira ticket and tests…',
+    };
+
+    // Active project and current job id are needed across handlers.
+    let activeProject = null;   // { id, name, key, description } or null
+    let currentJobId = null;
+
+    // ===== Auth =====
+    // Intercept fetch to redirect to /login on a 401 from the server.
+    const _origFetch = window.fetch;
+    window.fetch = async (...args) => {
+      const resp = await _origFetch(...args);
+      if (resp.status === 401) {
+        window.location.href = '/login?next=' + encodeURIComponent(window.location.pathname);
+      }
+      return resp;
+    };
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+      try { await fetch('/logout', { method: 'POST' }); } catch (_) { /* ignore */ }
+      try { sessionStorage.clear(); localStorage.removeItem('bt.activeProjectId'); } catch (_) { /* ignore */ }
+      window.location.href = '/login';
+    });
+
+    // Track short-circuit state for the current run.
+    let shortCircuited = false;
+    // Deduped accumulator of missing/blocking fields so `applyShortCircuit`
+    // can be called multiple times (gate event, then pipeline_done) and
+    // each call adds to the list without losing earlier entries.
+    const missingFields = new Map();   // key: `${kind}::${text}` → { kind, text }
+
+    function renderMissingFields() {
+      const list = document.getElementById('missing-info-list');
+      const items = Array.from(missingFields.values());
+      if (items.length === 0) {
+        list.innerHTML = '<li class="italic text-amber-800/80">(no specific fields cited by the analyser)</li>';
+        return;
+      }
+      list.innerHTML = items.map(i => `
+        <li class="flex items-start gap-2">
+          <span class="material-symbols-outlined mt-0.5 text-[14px]">${i.kind === 'blocking' ? 'block' : 'help'}</span>
+          <span><strong class="font-semibold">${i.kind === 'blocking' ? 'Blocking:' : 'Missing:'}</strong> ${escapeHtml(i.text)}</span>
+        </li>`).join('');
+    }
+
+    function applyShortCircuit(blockingFields = [], missingInfo = []) {
+      // Always accumulate any new fields, even on repeated calls.
+      (blockingFields || []).forEach(f => {
+        if (f) missingFields.set(`blocking::${f}`, { kind: 'blocking', text: f });
+      });
+      (missingInfo || []).forEach(f => {
+        if (f) missingFields.set(`missing::${f}`,  { kind: 'missing',  text: f });
+      });
+      renderMissingFields();
+      document.getElementById('missing-info-box').classList.remove('hidden');
+
+      if (shortCircuited) return;
+      shortCircuited = true;
+
+      // Mark downstream agents as skipped.
+      ['triage', 'artifact'].forEach(setSkipped);
+
+      // Re-style the spinner / progress bar to a "stopped" state.
+      const wrap = document.getElementById('progress-icon-wrap');
+      wrap.classList.remove('bg-blue-100','text-blue-700');
+      wrap.classList.add('bg-amber-100','text-amber-700');
+      const icon = document.getElementById('progress-icon');
+      icon.classList.remove('animate-spin');
+      icon.innerText = 'pause_circle';
+      document.getElementById('progress-title').innerText =
+        'Triage short-circuited';
+
+      const bar = document.getElementById('main-progress-bar');
+      bar.style.width = '100%';
+      bar.classList.remove('bg-blue-600');
+      bar.classList.add('bg-amber-500');
+
+      document.getElementById('status-message').innerText =
+        'The analyser flagged the report as incomplete. The pipeline stopped before triage and no bug was created.';
+    }
+
+    function resetProgressChrome() {
+      shortCircuited = false;
+      missingFields.clear();
+      const wrap = document.getElementById('progress-icon-wrap');
+      wrap.classList.remove('bg-amber-100','text-amber-700');
+      wrap.classList.add('bg-blue-100','text-blue-700');
+      const icon = document.getElementById('progress-icon');
+      icon.classList.add('animate-spin');
+      icon.innerText = 'sync';
+      document.getElementById('progress-title').innerText = 'Processing Bug Report';
+      const bar = document.getElementById('main-progress-bar');
+      bar.classList.remove('bg-amber-500');
+      bar.classList.add('bg-blue-600');
+      document.getElementById('missing-info-box').classList.add('hidden');
+      document.getElementById('missing-info-list').innerHTML = '';
+    }
+
+    // "Edit & Resubmit" — clears the viewed-run sessionStorage so the
+    // user returns to a fresh form. We deliberately do not prefill the
+    // textarea because the original markdown is still on the server and
+    // the user is expected to add the missing fields locally.
+    document.getElementById('edit-resubmit-btn').addEventListener('click', () => {
+      forgetJob();
+      document.getElementById('markdown-report').value = '';
+      showView('add');
+    });
+
+    // ===== Streaming via shared job store =====
+    async function consumeStream(jobId) {
+      currentJobId = jobId;
+      resetProgressChrome();
+      renderSteps();
+      setProgress(5, 'Connecting to triage job…');
+      showView('progress');
+
+      let buf = '';
+      let finalReport = null;
+      try {
+        const resp = await fetch(`/triage/${jobId}/stream`);
+        if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`);
+        const reader = resp.body.getReader();
+        const dec = new TextDecoder();
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          let idx;
+          while ((idx = buf.indexOf('\n')) >= 0) {
+            const line = buf.slice(0, idx).trim();
+            buf = buf.slice(idx + 1);
+            if (!line) continue;
+            let ev;
+            try { ev = JSON.parse(line); } catch { continue; }
+            handleEvent(ev);
+            if (ev.type === 'pipeline_done') finalReport = ev.final;
+          }
+        }
+      } catch (err) {
+        document.getElementById('status-message').innerText = 'Error: ' + err.message;
+        return;
+      }
+
+      // A short-circuited run still emits pipeline_done, but the user
+      // must stay on the steps view rather than being taken to the
+      // bug-summary screen. We check BOTH the in-flight flag and the
+      // final report status (replay-from-DB may not see `gate` first).
+      const isShortCircuit =
+        shortCircuited ||
+        (finalReport && finalReport.status === 'Needs More Information');
+
+      if (isShortCircuit) {
+        applyShortCircuit(
+          finalReport ? finalReport.blocking_fields : [],
+          finalReport ? finalReport.missing_information : [],
+        );
+        return;
+      }
+
+      if (finalReport) {
+        setProgress(100, 'Process complete!');
+        renderFinal(finalReport);
+        // Ensure summary chrome is in "freshly triaged" mode (Confirm visible,
+        // back button labelled "Triage Another") even if the user previously
+        // opened an existing issue from the backlog.
+        document.getElementById('confirm-create-btn').classList.remove('hidden');
+        const backBtn = document.getElementById('back-btn');
+        backBtn.textContent = 'Triage Another';
+        delete backBtn.dataset.mode;
+        setTimeout(() => { showView('summary'); loadChatHistory(); }, 600);
+      }
+    }
+
+    document.getElementById('bug-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const md = document.getElementById('markdown-report').value.trim();
+      if (!md) return;
+      if (!activeProject) {
+        alert('Select a project first.');
+        showView('projects');
+        return;
+      }
+
+      let jobId;
+      try {
+        const r = await fetch('/triage', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ bug_markdown: md, project_id: activeProject.id }),
+        });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        jobId = (await r.json()).job_id;
+      } catch (err) {
+        alert('Failed to start triage: ' + err.message);
+        return;
+      }
+      currentJobId = jobId;
+      rememberJob(jobId);
+      consumeStream(jobId);
+    });
+
+
+    // ===================================================================
+    // Project + Backlog state and wiring
+    // ===================================================================
+    const PROJECT_KEY = 'bt.activeProjectId';
+    let allProjects = [];
+
+    function setActiveProject(proj) {
+      activeProject = proj || null;
+      try {
+        if (proj) localStorage.setItem(PROJECT_KEY, String(proj.id));
+        else localStorage.removeItem(PROJECT_KEY);
+      } catch (_) { /* ignore storage errors */ }
+      renderActiveProjectChrome();
+    }
+
+    function renderActiveProjectChrome() {
+      const keyEl  = document.getElementById('active-project-key');
+      const nameEl = document.getElementById('active-project-name');
+      const formKeyEl  = document.getElementById('add-form-project-key');
+      const formNameEl = document.getElementById('add-form-project-name');
+      const crumbEl    = document.getElementById('add-breadcrumb-project');
+      const backCrumb  = document.getElementById('backlog-breadcrumb-project');
+      const banner = document.getElementById('no-project-banner');
+      const submitBtn = document.getElementById('submit-btn');
+
+      if (activeProject) {
+        keyEl.textContent = activeProject.key;
+        keyEl.classList.remove('bg-slate-300');
+        keyEl.classList.add('bg-blue-600');
+        nameEl.textContent = activeProject.name;
+
+        formKeyEl.textContent = activeProject.key;
+        formKeyEl.classList.remove('bg-slate-300');
+        formKeyEl.classList.add('bg-blue-600');
+        formNameEl.textContent = activeProject.name;
+
+        crumbEl.textContent   = activeProject.name;
+        backCrumb.textContent = activeProject.name;
+        banner.classList.add('hidden');
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-50','cursor-not-allowed');
+      } else {
+        keyEl.textContent = '—';
+        keyEl.classList.add('bg-slate-300');
+        keyEl.classList.remove('bg-blue-600');
+        nameEl.textContent = 'No project';
+
+        formKeyEl.textContent = '—';
+        formKeyEl.classList.add('bg-slate-300');
+        formKeyEl.classList.remove('bg-blue-600');
+        formNameEl.textContent = 'No project selected';
+
+        crumbEl.textContent   = '—';
+        backCrumb.textContent = '—';
+        banner.classList.remove('hidden');
+        submitBtn.disabled = true;
+        submitBtn.classList.add('opacity-50','cursor-not-allowed');
+      }
+    }
+
+    async function loadProjects() {
+      try {
+        const r = await fetch('/projects');
+        if (!r.ok) return [];
+        const { projects } = await r.json();
+        allProjects = projects || [];
+      } catch (_) {
+        allProjects = [];
+      }
+      return allProjects;
+    }
+
+    function renderProjectsList() {
+      const root = document.getElementById('projects-list');
+      if (!allProjects.length) {
+        root.innerHTML = `
+          <div class="col-span-full rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
+            No projects yet — create one above.
+          </div>`;
+        return;
+      }
+      root.innerHTML = allProjects.map(p => {
+        const isActive = activeProject && p.id === activeProject.id;
+        return `
+          <div class="rounded-xl border ${isActive ? 'border-blue-500 ring-1 ring-blue-200 bg-blue-50' : 'border-slate-200 bg-white'} p-4 transition">
+            <div class="flex items-center gap-3">
+              <div class="flex h-10 w-10 items-center justify-center rounded bg-blue-600 font-bold text-white">${escapeHtml(p.key)}</div>
+              <div class="min-w-0">
+                <h3 class="truncate text-base font-semibold text-slate-900">${escapeHtml(p.name)}</h3>
+                <p class="truncate text-xs text-slate-500">${escapeHtml(p.description || 'Software Project')}</p>
+              </div>
+            </div>
+            <div class="mt-3 flex gap-2">
+              ${isActive
+                ? '<span class="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">Selected</span>'
+                : `<button data-select-id="${p.id}" class="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700">Select</button>`}
+              <button data-view-backlog="${p.id}" class="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">View backlog</button>
+            </div>
+          </div>`;
+      }).join('');
+      root.querySelectorAll('[data-select-id]').forEach(b => {
+        b.addEventListener('click', () => {
+          const id = Number(b.getAttribute('data-select-id'));
+          const proj = allProjects.find(x => x.id === id);
+          if (proj) setActiveProject(proj);
+          renderProjectsList();
+        });
+      });
+      root.querySelectorAll('[data-view-backlog]').forEach(b => {
+        b.addEventListener('click', () => {
+          const id = Number(b.getAttribute('data-view-backlog'));
+          const proj = allProjects.find(x => x.id === id);
+          if (proj) setActiveProject(proj);
+          showView('backlog');
+        });
+      });
+    }
+
+    async function refreshProjects() {
+      await loadProjects();
+      renderProjectsList();
+    }
+
+    document.getElementById('project-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('proj-name').value.trim();
+      const key  = document.getElementById('proj-key').value.trim();
+      const desc = document.getElementById('proj-desc').value.trim();
+      const errEl = document.getElementById('project-form-error');
+      errEl.classList.add('hidden');
+      try {
+        const r = await fetch('/projects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, key: key || null, description: desc || null }),
+        });
+        if (!r.ok) {
+          const detail = (await r.json().catch(() => ({}))).detail || `HTTP ${r.status}`;
+          throw new Error(detail);
+        }
+        const proj = await r.json();
+        setActiveProject(proj);
+        document.getElementById('proj-name').value = '';
+        document.getElementById('proj-key').value  = '';
+        document.getElementById('proj-desc').value = '';
+        await refreshProjects();
+      } catch (err) {
+        errEl.textContent = String(err.message || err);
+        errEl.classList.remove('hidden');
+      }
+    });
+
+    // ----- Backlog -----
+    function badgeSev(sev) {
+      const cls = { Critical:'bg-red-100 text-red-800', High:'bg-red-100 text-red-700',
+                    Medium:'bg-amber-100 text-amber-800', Low:'bg-emerald-100 text-emerald-800' };
+      return `<span class="rounded-full px-2 py-0.5 text-xs font-semibold ${cls[sev] || 'bg-slate-100 text-slate-700'}">${escapeHtml(sev || '—')}</span>`;
+    }
+    function badgePri(pri) {
+      const cls = { P0:'bg-red-600 text-white', P1:'bg-orange-600 text-white',
+                    P2:'bg-amber-500 text-white', P3:'bg-slate-400 text-white' };
+      return `<span class="rounded-full px-2 py-0.5 text-xs font-semibold ${cls[pri] || 'bg-slate-200 text-slate-700'}">${escapeHtml(pri || '—')}</span>`;
+    }
+
+    async function refreshBacklog() {
+      const empty = document.getElementById('backlog-empty');
+      const wrap  = document.getElementById('backlog-table-wrap');
+      const rows  = document.getElementById('backlog-rows');
+      rows.innerHTML = '';
+      if (!activeProject) {
+        empty.classList.remove('hidden');
+        empty.innerHTML = '<p class="text-sm text-slate-500">Select a project from <a href="#projects" class="text-blue-700 font-semibold">Projects</a> to view its backlog.</p>';
+        wrap.classList.add('hidden');
+        return;
+      }
+      let issues = [];
+      try {
+        const r = await fetch(`/issues?project_id=${activeProject.id}`);
+        if (r.ok) issues = (await r.json()).issues || [];
+      } catch (_) { /* ignore */ }
+
+      if (!issues.length) {
+        empty.classList.remove('hidden');
+        empty.innerHTML = '<span class="material-symbols-outlined text-[40px] text-slate-300">inbox</span>' +
+          '<p class="mt-2 text-sm text-slate-500">No issues yet. Triage a bug and confirm it to populate the backlog.</p>';
+        wrap.classList.add('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+      wrap.classList.remove('hidden');
+      rows.innerHTML = issues.map(i => {
+        const when = new Date((i.created_at || 0) * 1000)
+          .toLocaleString(undefined, { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+        return `<tr data-issue-id="${i.id}" class="cursor-pointer hover:bg-slate-50">
+          <td class="px-4 py-3 font-mono text-xs text-slate-500">${escapeHtml(i.bug_id || `#${i.id}`)}</td>
+          <td class="px-4 py-3 font-medium text-slate-900">${escapeHtml(i.title || '')}</td>
+          <td class="px-4 py-3">${badgeSev(i.severity)}</td>
+          <td class="px-4 py-3">${badgePri(i.priority)}</td>
+          <td class="px-4 py-3 text-slate-700">${escapeHtml(i.team || '—')}</td>
+          <td class="px-4 py-3 text-slate-700">${escapeHtml(i.assignee || '—')}</td>
+          <td class="px-4 py-3 text-xs text-slate-500">${escapeHtml(when)}</td>
+        </tr>`;
+      }).join('');
+      rows.querySelectorAll('tr[data-issue-id]').forEach(tr => {
+        tr.addEventListener('click', () => openIssue(Number(tr.dataset.issueId)));
+      });
+    }
+
+    async function openIssue(issueId) {
+      try {
+        const r = await fetch(`/issues/${issueId}`);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const issue = await r.json();
+        const final = issue.final;
+        if (!final) {
+          alert('Issue has no stored final report.');
+          return;
+        }
+        renderFinal(final);
+        // Make the chat widget point at this run so the user can ask
+        // questions about the persisted issue too.
+        currentJobId = issue.job_id || null;
+        // Read-only mode: it's already in the backlog, no Confirm needed.
+        const confirmBtn = document.getElementById('confirm-create-btn');
+        const backBtn    = document.getElementById('back-btn');
+        confirmBtn.classList.add('hidden');
+        backBtn.textContent = 'Back to Backlog';
+        backBtn.dataset.mode = 'backlog';
+        showView('summary');
+        loadChatHistory();
+      } catch (err) {
+        alert('Failed to open issue: ' + err.message);
+      }
+    }
+
+    // ----- Confirm & Create Issue -----
+    document.getElementById('confirm-create-btn').addEventListener('click', async () => {
+      if (!activeProject || !currentJobId) {
+        alert('Missing project or run context.');
+        return;
+      }
+      try {
+        const r = await fetch('/issues', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ project_id: activeProject.id, job_id: currentJobId }),
+        });
+        if (!r.ok) {
+          const detail = (await r.json().catch(() => ({}))).detail || `HTTP ${r.status}`;
+          throw new Error(detail);
+        }
+        forgetJob();
+        currentJobId = null;
+        await refreshBacklog();
+        showView('backlog');
+      } catch (err) {
+        alert('Failed to create issue: ' + err.message);
+      }
+    });
+
+    // ----- Navigation -----
+    function bindNav(id, view) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('click', (e) => { e.preventDefault(); showView(view); });
+    }
+    bindNav('nav-projects',  'projects');
+    bindNav('nav-issues',    'backlog');
+    bindNav('side-backlog',  'backlog');
+    bindNav('side-create',   'add');
+    bindNav('side-projects', 'projects');
+    document.getElementById('active-project-card').addEventListener('click', () => showView('projects'));
+    document.getElementById('backlog-new-btn').addEventListener('click', () => showView('add'));
+
+    // ===================================================================
+    // Chat widget (grounded in the current run)
+    // ===================================================================
+    const chatLog   = document.getElementById('chat-log');
+    const chatForm  = document.getElementById('chat-form');
+    const chatInput = document.getElementById('chat-input');
+    const chatSend  = document.getElementById('chat-send');
+
+    function chatBubble(role, content) {
+      const isUser = role === 'user';
+      const wrap = document.createElement('div');
+      wrap.className = isUser ? 'flex justify-end' : 'flex justify-start';
+      const bubble = document.createElement('div');
+      bubble.className = (isUser
+        ? 'rounded-lg rounded-br-none bg-blue-600 text-white'
+        : 'rounded-lg rounded-bl-none bg-slate-100 text-slate-900')
+        + ' max-w-[85%] px-3 py-2 text-sm whitespace-pre-wrap';
+      bubble.textContent = content;
+      wrap.appendChild(bubble);
+      return wrap;
+    }
+
+    function chatTypingIndicator() {
+      const wrap = document.createElement('div');
+      wrap.id = 'chat-typing';
+      wrap.className = 'flex justify-start';
+      wrap.innerHTML = '<div class="rounded-lg rounded-bl-none bg-slate-100 text-slate-500 px-3 py-2 text-sm italic">thinking…</div>';
+      return wrap;
+    }
+
+    function chatPlaceholder() {
+      chatLog.innerHTML = '<p class="text-xs italic text-slate-400">Ask why this severity was chosen, who was assigned, or what evidence the analyser used.</p>';
+    }
+
+    function chatScrollBottom() {
+      chatLog.scrollTop = chatLog.scrollHeight;
+    }
+
+    async function loadChatHistory() {
+      chatPlaceholder();
+      if (!currentJobId) return;
+      try {
+        const r = await fetch(`/chat/${currentJobId}`);
+        if (!r.ok) return;
+        const { messages } = await r.json();
+        if (!messages || messages.length === 0) return;
+        chatLog.innerHTML = '';
+        messages.forEach(m => chatLog.appendChild(chatBubble(m.role, m.content)));
+        chatScrollBottom();
+      } catch (_) { /* ignore */ }
+    }
+
+    chatForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const content = chatInput.value.trim();
+      if (!content || !currentJobId) return;
+      // Drop the placeholder on first send.
+      if (chatLog.querySelector('p.italic')) chatLog.innerHTML = '';
+      chatLog.appendChild(chatBubble('user', content));
+      chatInput.value = '';
+      chatInput.disabled = true;
+      chatSend.disabled = true;
+      const typing = chatTypingIndicator();
+      chatLog.appendChild(typing);
+      chatScrollBottom();
+      try {
+        const r = await fetch(`/chat/${currentJobId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content }),
+        });
+        if (!r.ok) {
+          const detail = (await r.json().catch(() => ({}))).detail || `HTTP ${r.status}`;
+          throw new Error(detail);
+        }
+        const { content: reply } = await r.json();
+        typing.remove();
+        chatLog.appendChild(chatBubble('assistant', reply || '(empty reply)'));
+      } catch (err) {
+        typing.remove();
+        const errDiv = document.createElement('div');
+        errDiv.className = 'flex justify-start';
+        errDiv.innerHTML = `<div class="rounded-lg bg-red-50 text-red-700 px-3 py-2 text-sm">Failed: ${escapeHtml(err.message || String(err))}</div>`;
+        chatLog.appendChild(errDiv);
+      } finally {
+        chatInput.disabled = false;
+        chatSend.disabled = false;
+        chatInput.focus();
+        chatScrollBottom();
+      }
+    });
+
+    // ===================================================================
+    // Bootstrap
+    // ===================================================================
+    async function bootstrap() {
+      await loadProjects();
+      let storedId = null;
+      try { storedId = localStorage.getItem(PROJECT_KEY); } catch (_) { /* ignore */ }
+      const stored = storedId ? allProjects.find(p => String(p.id) === String(storedId)) : null;
+      if (stored) setActiveProject(stored);
+      else if (allProjects.length) setActiveProject(allProjects[0]);
+      else setActiveProject(null);
+      renderProjectsList();
+
+      // Resume an in-flight (or last-viewed) run if any.
+      const recalled = recalledJob();
+      if (recalled) {
+        consumeStream(recalled);
+        return;
+      }
+      try {
+        const r = await fetch('/triage/current');
+        if (r.ok) {
+          const { job_id } = await r.json();
+          if (job_id) {
+            rememberJob(job_id);
+            consumeStream(job_id);
+            return;
+          }
+        }
+      } catch (_) { /* ignore */ }
+
+      // No active run — first-time visit with no projects goes to Projects view.
+      if (!allProjects.length) showView('projects');
+      else showView('add');
+    }
+    bootstrap();
+
+    function handleEvent(ev) {
+      switch (ev.type) {
+        case 'start':
+          setActive(ev.agent);
+          setProgress(Math.max(10, (PROGRESS_BY_AGENT[ev.agent] || 50) - 15),
+                      START_MSG[ev.agent] || `${ev.agent} running…`);
+          break;
+        case 'done':
+          setComplete(ev.agent);
+          setProgress(PROGRESS_BY_AGENT[ev.agent] || 90);
+          break;
+        case 'failed':
+          setFailed(ev.agent);
+          break;
+        case 'gate':
+          if (ev.verdict === 'needs_more_info') {
+            applyShortCircuit(ev.blocking_fields, []);
+          }
+          break;
+        case 'rule':
+          document.getElementById('status-message').innerText =
+            `Rule applied: ${ev.rule_id} → ${ev.severity} / ${ev.priority} (${ev.team}).`;
+          break;
+        case 'pipeline_failed':
+          document.getElementById('status-message').innerText = 'Pipeline failed: ' + ev.error;
+          break;
+      }
+    }
+  </script>
+</body>
+</html>
