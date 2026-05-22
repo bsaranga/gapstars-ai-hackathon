@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Stre
 from pydantic import BaseModel
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from . import auth, db
+from . import auth, chat, db
 from .config import load_all
 from .jobs import SENTINEL, store
 
@@ -177,6 +177,35 @@ def issue_detail(issue_id: int) -> dict:
     if row is None:
         raise HTTPException(status_code=404, detail="unknown issue_id")
     return row
+
+
+class ChatRequest(BaseModel):
+    content: str
+
+
+@app.get("/chat/{job_id}")
+def chat_history(job_id: str) -> dict:
+    if db.get_run(job_id) is None:
+        raise HTTPException(status_code=404, detail="unknown job_id")
+    return {"messages": db.list_chat(job_id)}
+
+
+@app.post("/chat/{job_id}")
+async def chat_send(job_id: str, req: ChatRequest) -> dict:
+    run = db.get_run(job_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="unknown job_id")
+    user_content = (req.content or "").strip()
+    if not user_content:
+        raise HTTPException(status_code=400, detail="content required")
+    history = db.list_chat(job_id)
+    try:
+        assistant_content = await chat.reply(run, history, user_content)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail=f"chat failed: {exc}") from exc
+    db.add_chat(job_id, "user", user_content)
+    db.add_chat(job_id, "assistant", assistant_content)
+    return {"content": assistant_content}
 
 
 @app.get("/triage/current")

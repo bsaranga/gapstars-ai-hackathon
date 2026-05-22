@@ -77,6 +77,20 @@ def init() -> None:
         cols = [r[1] for r in c.execute("PRAGMA table_info(runs)").fetchall()]
         if "project_id" not in cols:
             c.execute("ALTER TABLE runs ADD COLUMN project_id INTEGER")
+        c.execute(
+            """
+            CREATE TABLE IF NOT EXISTS chat_messages (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              job_id TEXT NOT NULL,
+              role TEXT NOT NULL,
+              content TEXT NOT NULL,
+              created_at REAL NOT NULL
+            )
+            """
+        )
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_chat_messages_job ON chat_messages(job_id)"
+        )
 
 
 def insert_run(job_id: str, bug_markdown: str, project_id: int | None = None) -> None:
@@ -174,6 +188,26 @@ def get_issue(issue_id: int) -> dict | None:
     raw = d.pop("final_json", None)
     d["final"] = json.loads(raw) if raw else None
     return d
+
+
+def list_chat(job_id: str) -> list[dict]:
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT id, role, content, created_at FROM chat_messages "
+            "WHERE job_id=? ORDER BY id ASC",
+            (job_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def add_chat(job_id: str, role: str, content: str) -> int:
+    with _conn() as c:
+        cur = c.execute(
+            "INSERT INTO chat_messages(job_id, role, content, created_at) "
+            "VALUES(?, ?, ?, ?)",
+            (job_id, role, content, time.time()),
+        )
+        return cur.lastrowid  # type: ignore[return-value]
 
 
 def list_issues(project_id: int) -> list[dict]:
