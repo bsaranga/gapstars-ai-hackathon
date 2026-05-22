@@ -4,20 +4,21 @@ import json
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
 from .config import load_all
 from .pipeline_events import triage_events
 
 _STATIC_DIR = Path(__file__).parent / "static"
+_UI_STATIC_DIR = Path(__file__).resolve().parent.parent / "ui" / "static"
 
 app = FastAPI(title="Bug Triage Dashboard")
 
 
 @app.get("/")
-def root() -> RedirectResponse:
-    return RedirectResponse(url="/dashboard", status_code=307)
+def root() -> FileResponse:
+    return FileResponse(_UI_STATIC_DIR / "index.html")
 
 
 @app.get("/dashboard")
