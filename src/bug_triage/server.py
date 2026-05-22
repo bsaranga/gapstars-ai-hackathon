@@ -107,6 +107,14 @@ def issues_list(project_id: int) -> dict:
     return {"issues": db.list_issues(project_id)}
 
 
+@app.get("/issues/{issue_id}")
+def issue_detail(issue_id: int) -> dict:
+    row = db.get_issue(issue_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="unknown issue_id")
+    return row
+
+
 @app.get("/triage/current")
 def triage_current() -> dict:
     """The currently *running* job id (or null). Finished runs are not

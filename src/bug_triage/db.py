@@ -163,6 +163,19 @@ def create_issue(project_id: int, job_id: str | None, final: dict) -> int:
         return cur.lastrowid  # type: ignore[return-value]
 
 
+def get_issue(issue_id: int) -> dict | None:
+    with _conn() as c:
+        row = c.execute(
+            "SELECT * FROM issues WHERE id=?", (issue_id,)
+        ).fetchone()
+    if row is None:
+        return None
+    d = dict(row)
+    raw = d.pop("final_json", None)
+    d["final"] = json.loads(raw) if raw else None
+    return d
+
+
 def list_issues(project_id: int) -> list[dict]:
     with _conn() as c:
         rows = c.execute(

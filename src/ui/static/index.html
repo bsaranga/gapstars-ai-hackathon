@@ -434,6 +434,16 @@
     const recalledJob = ()   => { try { return sessionStorage.getItem(TAB_KEY); } catch (_) { return null; } };
 
     document.getElementById('back-btn').addEventListener('click', () => {
+      const btn = document.getElementById('back-btn');
+      if (btn.dataset.mode === 'backlog') {
+        // Coming from "open issue from backlog" — restore default summary
+        // controls and go back to the backlog list.
+        document.getElementById('confirm-create-btn').classList.remove('hidden');
+        btn.textContent = 'Triage Another';
+        delete btn.dataset.mode;
+        showView('backlog');
+        return;
+      }
       document.getElementById('markdown-report').value = '';
       forgetJob();
       showView('add');
@@ -802,6 +812,13 @@
       if (finalReport) {
         setProgress(100, 'Process complete!');
         renderFinal(finalReport);
+        // Ensure summary chrome is in "freshly triaged" mode (Confirm visible,
+        // back button labelled "Triage Another") even if the user previously
+        // opened an existing issue from the backlog.
+        document.getElementById('confirm-create-btn').classList.remove('hidden');
+        const backBtn = document.getElementById('back-btn');
+        backBtn.textContent = 'Triage Another';
+        delete backBtn.dataset.mode;
         setTimeout(() => showView('summary'), 600);
       }
     }
@@ -1028,7 +1045,7 @@
       rows.innerHTML = issues.map(i => {
         const when = new Date((i.created_at || 0) * 1000)
           .toLocaleString(undefined, { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
-        return `<tr class="hover:bg-slate-50">
+        return `<tr data-issue-id="${i.id}" class="cursor-pointer hover:bg-slate-50">
           <td class="px-4 py-3 font-mono text-xs text-slate-500">${escapeHtml(i.bug_id || `#${i.id}`)}</td>
           <td class="px-4 py-3 font-medium text-slate-900">${escapeHtml(i.title || '')}</td>
           <td class="px-4 py-3">${badgeSev(i.severity)}</td>
@@ -1038,6 +1055,32 @@
           <td class="px-4 py-3 text-xs text-slate-500">${escapeHtml(when)}</td>
         </tr>`;
       }).join('');
+      rows.querySelectorAll('tr[data-issue-id]').forEach(tr => {
+        tr.addEventListener('click', () => openIssue(Number(tr.dataset.issueId)));
+      });
+    }
+
+    async function openIssue(issueId) {
+      try {
+        const r = await fetch(`/issues/${issueId}`);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const issue = await r.json();
+        const final = issue.final;
+        if (!final) {
+          alert('Issue has no stored final report.');
+          return;
+        }
+        renderFinal(final);
+        // Read-only mode: it's already in the backlog, no Confirm needed.
+        const confirmBtn = document.getElementById('confirm-create-btn');
+        const backBtn    = document.getElementById('back-btn');
+        confirmBtn.classList.add('hidden');
+        backBtn.textContent = 'Back to Backlog';
+        backBtn.dataset.mode = 'backlog';
+        showView('summary');
+      } catch (err) {
+        alert('Failed to open issue: ' + err.message);
+      }
     }
 
     // ----- Confirm & Create Issue -----
