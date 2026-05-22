@@ -37,8 +37,13 @@
           <a id="nav-issues"   href="#backlog"  class="nav-link flex items-center h-full px-2 text-sm font-semibold text-slate-600 hover:text-slate-900 transition">Issues</a>
         </nav>
       </div>
-      <div class="flex items-center gap-4">
+      <div class="flex items-center gap-3">
         <button id="nav-new" class="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 transition">Create</button>
+        <button id="logout-btn"
+                class="rounded-md border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-100 transition"
+                title="Sign out">
+          Sign out
+        </button>
       </div>
     </div>
   </header>
@@ -673,6 +678,22 @@
     // Active project and current job id are needed across handlers.
     let activeProject = null;   // { id, name, key, description } or null
     let currentJobId = null;
+
+    // ===== Auth =====
+    // Intercept fetch to redirect to /login on a 401 from the server.
+    const _origFetch = window.fetch;
+    window.fetch = async (...args) => {
+      const resp = await _origFetch(...args);
+      if (resp.status === 401) {
+        window.location.href = '/login?next=' + encodeURIComponent(window.location.pathname);
+      }
+      return resp;
+    };
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+      try { await fetch('/logout', { method: 'POST' }); } catch (_) { /* ignore */ }
+      try { sessionStorage.clear(); localStorage.removeItem('bt.activeProjectId'); } catch (_) { /* ignore */ }
+      window.location.href = '/login';
+    });
 
     // Track short-circuit state for the current run.
     let shortCircuited = false;

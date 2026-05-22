@@ -4,11 +4,12 @@ import json
 import sqlite3
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel
+from starlette.middleware.base import BaseHTTPMiddleware
 
-from . import db
+from . import auth, db
 from .config import load_all
 from .jobs import SENTINEL, store
 
@@ -18,6 +19,69 @@ _STATIC_DIR = Path(__file__).parent / "static"
 _UI_STATIC_DIR = Path(__file__).resolve().parent.parent / "ui" / "static"
 
 app = FastAPI(title="Bug Triage Dashboard")
+
+
+# ---------- auth middleware ----------
+
+_PUBLIC_PATHS = {"/login", "/login/", "/healthz"}
+_PUBLIC_PREFIXES = ("/docs", "/openapi.json", "/redoc")
+
+
+class AuthMiddleware(BaseHTTPMiddleware):
+    """Require a valid session cookie for every non-public route.
+
+    HTML GETs without a session are redirected to /login. Everything
+    else gets a 401 JSON response so client-side fetch() can branch.
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        if path in _PUBLIC_PATHS or path.startswith(_PUBLIC_PREFIXES):
+            return await call_next(request)
+        token = request.cookies.get(auth.COOKIE_NAME)
+        if not auth.is_authenticated(token):
+            if request.method == "GET" and "text/html" in request.headers.get("accept", ""):
+                return RedirectResponse(url="/login", status_code=303)
+            return JSONResponse({"detail": "unauthorized"}, status_code=401)
+        return await call_next(request)
+
+
+app.add_middleware(AuthMiddleware)
+
+
+# ---------- auth routes ----------
+
+
+@app.get("/login")
+def login_page() -> FileResponse:
+    return FileResponse(_UI_STATIC_DIR / "login.html")
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+@app.post("/login")
+def login(req: LoginRequest, response: Response) -> dict:
+    if not auth.authenticate(req.username, req.password):
+        raise HTTPException(status_code=401, detail="invalid credentials")
+    token = auth.create_session()
+    response.set_cookie(
+        auth.COOKIE_NAME,
+        token,
+        httponly=True,
+        samesite="lax",
+        path="/",
+    )
+    return {"ok": True}
+
+
+@app.post("/logout")
+def logout(request: Request, response: Response) -> dict:
+    auth.destroy_session(request.cookies.get(auth.COOKIE_NAME))
+    response.delete_cookie(auth.COOKIE_NAME, path="/")
+    return {"ok": True}
 
 
 @app.get("/")
