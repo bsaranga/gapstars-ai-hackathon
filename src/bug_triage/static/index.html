@@ -1,0 +1,623 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Bug Triage Dashboard</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #161922; --border: #262a36; --muted: #8a93a6;
+    --fg: #e6e9f0; --accent: #6aa8ff; --ok: #4ade80; --warn: #fbbf24;
+    --err: #f87171; --pill: #1f2433; --link: #303644;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 -apple-system, system-ui, sans-serif;
+    background: var(--bg); color: var(--fg); }
+  header { padding: 14px 24px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+  header .sub { color: var(--muted); font-size: 12px; }
+  main { display: grid; grid-template-columns: 380px 1fr 360px; gap: 16px;
+    padding: 16px 24px; min-height: calc(100vh - 58px); }
+  .panel { background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 16px; display: flex; flex-direction: column;
+    min-width: 0; }
+  .panel h2 { font-size: 12px; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--muted); margin: 0 0 10px 0;
+    font-weight: 600; }
+  textarea { width: 100%; flex: 1; min-height: 380px; background: #0b0d12;
+    color: var(--fg); border: 1px solid var(--border); border-radius: 6px;
+    padding: 12px; font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+    resize: vertical; }
+  button { background: var(--accent); color: #0b0d12; border: 0;
+    padding: 10px 16px; border-radius: 6px; font-weight: 600; cursor: pointer;
+    margin-top: 12px; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* ---------------- graph canvas ---------------- */
+  /* Fixed 600 × 760 px so the SVG link layer and the absolutely-positioned
+     HTML node boxes share one pixel grid (no scaling). */
+  .graph-wrap { position: relative; width: 600px; height: 760px;
+    margin: 0 auto; }
+  .graph-svg { position: absolute; inset: 0; width: 600px; height: 760px;
+    pointer-events: none; overflow: visible; }
+
+  /* ---------------- nodes ---------------- */
+  .node { position: absolute; transform: translate(-50%, -50%);
+    background: #0b0d12; border: 1.5px solid var(--border);
+    border-radius: 8px; padding: 10px 14px; min-width: 160px;
+    text-align: center; transition: border-color .25s, box-shadow .25s,
+    background .25s, transform .12s; user-select: none; }
+  .node.clickable { cursor: pointer; }
+  .node.clickable:hover { transform: translate(-50%, -50%) scale(1.03); }
+  .node.selected { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .node .label { font-size: 11px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.06em; }
+  .node .title { font-weight: 600; font-size: 14px; margin-top: 2px; }
+  .node .meta { font-size: 11px; color: var(--muted); margin-top: 4px;
+    min-height: 14px; }
+
+  .node.idle    { opacity: 0.55; }
+  .node.running { border-color: var(--accent); background: #11233d;
+    box-shadow: 0 0 0 0 rgba(106,168,255,0.5);
+    animation: pulse 1.4s ease-in-out infinite; }
+  .node.done    { border-color: var(--ok);   background: #0e2218; }
+  .node.failed  { border-color: var(--err);  background: #2a1212; }
+  .node.warn    { border-color: var(--warn); background: #2a2210; }
+
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0    rgba(106,168,255,0.55); }
+    50%      { box-shadow: 0 0 0 10px rgba(106,168,255,0); }
+  }
+
+  .node.gate { width: 140px; height: 90px; padding: 0;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center;
+    clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+  .node.gate .title { font-size: 13px; }
+  .node.small { min-width: 150px; padding: 8px 12px; }
+  .node.tools { min-width: 180px; text-align: left; padding: 10px 12px; }
+  .node.tools .tool { font: 11px ui-monospace, monospace; color: var(--muted);
+    margin-top: 2px; transition: color .25s; }
+  .node.tools .tool.active { color: var(--accent); }
+  .node.tools .tool.used   { color: var(--ok); }
+  .node.terminus { min-width: 130px; padding: 8px 12px;
+    border-style: dashed; }
+
+  /* ---------------- links ---------------- */
+  .link { fill: none; stroke: var(--link); stroke-width: 2;
+    transition: stroke .25s; }
+  .link.flowing { stroke: var(--accent); stroke-dasharray: 8 6;
+    animation: march 0.6s linear infinite; }
+  .link.done   { stroke: var(--ok); }
+  .link.failed { stroke: var(--err); }
+  .link.warn   { stroke: var(--warn); }
+  .link.muted  { stroke: #1d212c; }
+  .link.dashed { stroke-dasharray: 4 4; }
+  @keyframes march { to { stroke-dashoffset: -28; } }
+  .arrowhead { fill: var(--link); transition: fill .25s; }
+  .arrowhead.flowing { fill: var(--accent); }
+  .arrowhead.done    { fill: var(--ok); }
+  .arrowhead.failed  { fill: var(--err); }
+  .arrowhead.warn    { fill: var(--warn); }
+
+  /* ---------------- inspector ---------------- */
+  .inspector { flex: 1; overflow-y: auto; }
+  .inspector .empty { color: var(--muted); font-style: italic;
+    text-align: center; padding: 40px 12px; }
+  .inspector h3 { font-size: 13px; margin: 0 0 4px 0; font-weight: 600; }
+  .inspector .status-row { display: flex; gap: 6px; align-items: center;
+    margin-bottom: 12px; flex-wrap: wrap; }
+  .inspector h4 { font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--muted); margin: 14px 0 4px 0;
+    font-weight: 600; }
+  .pill { background: var(--pill); padding: 2px 8px; border-radius: 999px;
+    font-size: 11px; color: var(--muted); }
+  .pill.running { color: var(--accent); }
+  .pill.done    { color: var(--ok); }
+  .pill.failed  { color: var(--err); }
+  .pill.warn    { color: var(--warn); }
+
+  /* ---------------- final report ---------------- */
+  .outputs { margin-top: 16px; padding-top: 12px;
+    border-top: 1px solid var(--border); }
+  .outputs.hidden { display: none; }
+  .status-banner { padding: 10px 12px; border-radius: 6px; margin-bottom: 12px;
+    font-weight: 600; }
+  .status-banner.triaged    { background: rgba(74,222,128,0.1); color: var(--ok); }
+  .status-banner.needs_info { background: rgba(251,191,36,0.1); color: var(--warn); }
+  .status-banner.failed     { background: rgba(248,113,113,0.1); color: var(--err); }
+  .kv { display: grid; grid-template-columns: 150px 1fr; gap: 6px 12px;
+    margin-bottom: 12px; }
+  .kv .k { color: var(--muted); }
+  pre { background: #0b0d12; color: var(--fg); margin: 4px 0 0 0;
+    padding: 10px; border-radius: 4px; border: 1px solid var(--border);
+    font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+    white-space: pre-wrap; word-break: break-word; max-height: 320px;
+    overflow: auto; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 12px;
+    margin-top: 8px; }
+  .err-text { color: var(--err); font-family: ui-monospace, monospace;
+    font-size: 12px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Bug Triage Dashboard</h1>
+  <span class="sub">paste a bug report and click any node to inspect its inputs &amp; outputs</span>
+</header>
+<main>
+  <!-- LEFT: input -->
+  <section class="panel">
+    <h2>Bug report (markdown)</h2>
+    <textarea id="bug" placeholder="# Bug title
+
+Description...
+
+## Steps to reproduce
+1. ...
+
+## Expected
+...
+
+## Actual
+...
+
+## Environment
+- OS: macOS 14
+- Browser: Safari 17
+- App version: production v4.12
+"></textarea>
+    <button id="submit">Triage</button>
+  </section>
+
+  <!-- MIDDLE: graph -->
+  <section class="panel">
+    <h2>Pipeline</h2>
+
+    <div id="graph" class="graph-wrap">
+      <svg class="graph-svg" viewBox="0 0 600 760"
+           preserveAspectRatio="xMinYMin meet">
+        <defs>
+          <marker id="ah-idle"    viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" class="arrowhead" />
+          </marker>
+          <marker id="ah-flowing" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" class="arrowhead flowing" />
+          </marker>
+          <marker id="ah-done"    viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" class="arrowhead done" />
+          </marker>
+          <marker id="ah-failed"  viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" class="arrowhead failed" />
+          </marker>
+          <marker id="ah-warn"    viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" class="arrowhead warn" />
+          </marker>
+        </defs>
+
+        <!--
+          600 × 760 px canvas.
+          Main column centred at x=240; side branches at x=480.
+          Vertical centres:
+            input  35   parser 130   analyzer 235   gate 345
+            rule   450  triage 565   artifact 685
+          Side nodes centred at y=345 (short) and y=565 (tools).
+          Lines stop ~3 px short of the next box's edge so the arrow is visible.
+        -->
+        <path id="lk-input-parser"    class="link"
+              d="M 240 60  L 240 92"  marker-end="url(#ah-idle)" />
+        <path id="lk-parser-analyzer" class="link"
+              d="M 240 165 L 240 197" marker-end="url(#ah-idle)" />
+        <path id="lk-analyzer-gate"   class="link"
+              d="M 240 270 L 240 302" marker-end="url(#ah-idle)" />
+        <path id="lk-gate-rule"       class="link"
+              d="M 240 390 L 240 420" marker-end="url(#ah-idle)" />
+        <path id="lk-gate-short"      class="link muted"
+              d="M 310 345 L 402 345" marker-end="url(#ah-idle)" />
+        <path id="lk-rule-triage"     class="link"
+              d="M 240 480 L 240 527" marker-end="url(#ah-idle)" />
+        <path id="lk-triage-tools"    class="link dashed"
+              d="M 330 553 L 388 553" marker-end="url(#ah-idle)" />
+        <path id="lk-tools-triage"    class="link dashed"
+              d="M 388 577 L 333 577" marker-end="url(#ah-idle)" />
+        <path id="lk-triage-artifact" class="link"
+              d="M 240 600 L 240 647" marker-end="url(#ah-idle)" />
+      </svg>
+
+      <!-- Node layer (HTML, same pixel space as the SVG above).
+           transform: translate(-50%, -50%) makes (left, top) the box CENTER. -->
+      <div id="n-input" class="node terminus done clickable"
+           style="left:240px; top:35px;">
+        <div class="label">input</div><div class="title">bug.md</div>
+      </div>
+
+      <div id="n-parser" class="node idle clickable"
+           style="left:240px; top:130px;">
+        <div class="label">agent</div>
+        <div class="title">parser</div>
+        <div class="meta" id="m-parser">idle</div>
+      </div>
+
+      <div id="n-analyzer" class="node idle clickable"
+           style="left:240px; top:235px;">
+        <div class="label">agent</div>
+        <div class="title">analyzer</div>
+        <div class="meta" id="m-analyzer">idle</div>
+      </div>
+
+      <div id="n-gate" class="node gate idle clickable"
+           style="left:240px; top:345px;">
+        <div class="label">gate</div>
+        <div class="title">completeness</div>
+      </div>
+
+      <div id="n-short" class="node small terminus idle clickable"
+           style="left:480px; top:345px;">
+        <div class="label">short-circuit</div>
+        <div class="title">needs info</div>
+      </div>
+
+      <div id="n-rule" class="node small idle clickable"
+           style="left:240px; top:450px;">
+        <div class="label">deterministic</div>
+        <div class="title">rule + team</div>
+        <div class="meta" id="m-rule">awaiting gate</div>
+      </div>
+
+      <div id="n-triage" class="node idle clickable"
+           style="left:240px; top:565px;">
+        <div class="label">agent</div>
+        <div class="title">triage</div>
+        <div class="meta" id="m-triage">idle</div>
+      </div>
+
+      <div id="n-tools" class="node tools idle clickable"
+           style="left:480px; top:565px;">
+        <div class="label">tools</div>
+        <div class="tool" id="tool-team">get_team_members</div>
+        <div class="tool" id="tool-hist">get_developer_history</div>
+      </div>
+
+      <div id="n-artifact" class="node idle clickable"
+           style="left:240px; top:685px;">
+        <div class="label">agent</div>
+        <div class="title">artifact</div>
+        <div class="meta" id="m-artifact">idle</div>
+      </div>
+    </div>
+
+    <!-- Final report (rendered after pipeline_done) -->
+    <div id="outputs" class="outputs hidden"></div>
+  </section>
+
+  <!-- RIGHT: inspector -->
+  <section class="panel">
+    <h2>Inspector</h2>
+    <div id="inspector" class="inspector">
+      <div class="empty">Click any node to inspect its inputs, outputs and errors.</div>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const $bug = $('bug'), $submit = $('submit'),
+      $outputs = $('outputs'), $inspector = $('inspector');
+
+// ------- per-node captured data -------
+const data = {};   // node id -> { input, output, error, status, meta, extra }
+const NODE_IDS = ['input','parser','analyzer','gate','short','rule',
+                  'triage','tools','artifact'];
+function emptyEntry() { return { input: null, output: null, error: null,
+  status: 'idle', meta: '', extra: null }; }
+function resetData() {
+  NODE_IDS.forEach(id => { data[id] = emptyEntry(); });
+  data.input.status = 'done';
+}
+
+// agent name in the event stream ←→ DOM node id
+const NODE_FOR_AGENT = {
+  parser: 'parser', analyzer: 'analyzer', triage: 'triage', artifact: 'artifact',
+};
+// each agent's incoming link
+const INCOMING_LINK = {
+  parser:   'lk-input-parser',
+  analyzer: 'lk-parser-analyzer',
+  triage:   'lk-rule-triage',
+  artifact: 'lk-triage-artifact',
+};
+
+// ------- DOM helpers -------
+function setNode(id, state, meta) {
+  const el = $('n-' + id);
+  if (!el) return;
+  el.classList.remove('idle', 'running', 'done', 'failed', 'warn');
+  el.classList.add(state);
+  data[id].status = state;
+  if (meta != null) {
+    data[id].meta = meta;
+    const m = $('m-' + id);
+    if (m) m.textContent = meta;
+  }
+}
+function setLink(id, state) {
+  const el = $(id);
+  if (!el) return;
+  el.classList.remove('flowing', 'done', 'failed', 'warn', 'muted');
+  if (state) el.classList.add(state);
+  const markerByState = {
+    flowing: 'ah-flowing', done: 'ah-done',
+    failed:  'ah-failed',  warn: 'ah-warn',
+  };
+  el.setAttribute('marker-end', `url(#${markerByState[state] || 'ah-idle'})`);
+}
+
+// ------- inspector -------
+let selectedNode = null;
+
+const NODE_TITLES = {
+  input:    'Input · bug.md',
+  parser:   'Agent · parser',
+  analyzer: 'Agent · analyzer',
+  gate:     'Completeness Gate (deterministic)',
+  short:    'Short-circuit · Needs More Information',
+  rule:     'Rule + Team (deterministic)',
+  triage:   'Agent · triage',
+  tools:    'Tools · used by triage',
+  artifact: 'Agent · artifact',
+};
+const NODE_DESCRIPTIONS = {
+  input:    'The markdown pasted into the form. Sent verbatim to the parser agent.',
+  parser:   'LLM agent. Converts the raw markdown into a structured BugReport.',
+  analyzer: 'LLM agent. Emits AnalysisOutput including the completeness verdict.',
+  gate:     'Pure rule. Branches the pipeline based on analyzer.completeness.verdict.',
+  short:    'When the analyzer says the report is incomplete, the pipeline ends here — no triage spend, no artifacts.',
+  rule:     'Pure rule. Picks severity / priority via the §5.3 table and the owner team via teams.json.',
+  triage:   'LLM agent. Picks an assignee by calling get_team_members + get_developer_history. Budget: 1 + 3 tool calls.',
+  tools:    'Pure-read tool functions over teams.json and tasks.json. Invoked by the triage agent.',
+  artifact: 'LLM agent. Produces Jira ticket, test cases, dup-check query, and Slack handoff note.',
+};
+
+function selectNode(id) {
+  if (!data[id]) return;
+  selectedNode = id;
+  document.querySelectorAll('.node').forEach(n => n.classList.remove('selected'));
+  $('n-' + id)?.classList.add('selected');
+  renderInspector();
+}
+
+function renderInspector() {
+  if (!selectedNode) return;
+  const d = data[selectedNode];
+  const title = NODE_TITLES[selectedNode] || selectedNode;
+  const desc  = NODE_DESCRIPTIONS[selectedNode] || '';
+  const pill  = `<span class="pill ${d.status}">${d.status}</span>`;
+  const tags  = [pill];
+  if (d.elapsed_ms != null) tags.push(`<span class="pill">${d.elapsed_ms} ms</span>`);
+  if (d.tokens && d.tokens.total) tags.push(`<span class="pill">${d.tokens.total} tokens</span>`);
+
+  const pre = (label, val) =>
+    val == null ? '' : `<h4>${label}</h4><pre>${escapeHtml(val)}</pre>`;
+  const json = (label, val) =>
+    val == null ? '' : `<h4>${label}</h4><pre>${escapeHtml(JSON.stringify(val, null, 2))}</pre>`;
+
+  $inspector.innerHTML = `
+    <h3>${title}</h3>
+    <div class="status-row">${tags.join(' ')}</div>
+    <div style="color: var(--muted); font-size: 12px; margin-bottom: 8px;">${desc}</div>
+    ${d.meta ? `<div style="font-size: 12px;">${escapeHtml(d.meta)}</div>` : ''}
+    ${d.error ? `<h4>Error</h4><div class="err-text">${escapeHtml(d.error)}</div>` : ''}
+    ${typeof d.input === 'string'
+        ? pre('Input', d.input)
+        : json('Input', d.input)}
+    ${json('Output', d.output)}
+    ${json('Details', d.extra)}
+  `;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+// click handlers — wire after DOM is built
+NODE_IDS.forEach(id => {
+  const el = $('n-' + id);
+  if (!el) return;
+  el.addEventListener('click', () => selectNode(id));
+});
+
+// ------- event-stream handling -------
+function resetGraph() {
+  resetData();
+  ['parser','analyzer','gate','short','rule','triage','tools','artifact']
+    .forEach(id => setNode(id, 'idle', id === 'rule' ? 'awaiting gate' : 'idle'));
+  ['lk-input-parser','lk-parser-analyzer','lk-analyzer-gate','lk-gate-rule',
+   'lk-rule-triage','lk-triage-artifact'].forEach(id => setLink(id, null));
+  setLink('lk-gate-short',   'muted');
+  setLink('lk-triage-tools', 'muted');
+  setLink('lk-tools-triage', 'muted');
+  ['tool-team','tool-hist'].forEach(t => {
+    $(t).classList.remove('active', 'used');
+  });
+  $outputs.innerHTML = '';
+  $outputs.classList.add('hidden');
+  data.input.input = $bug.value;
+  data.input.output = $bug.value;
+  if (selectedNode) renderInspector();
+}
+
+function handleEvent(ev) {
+  if (ev.type === 'start') {
+    const id = NODE_FOR_AGENT[ev.agent];
+    if (id) {
+      data[id].input = ev.input;
+      setLink(INCOMING_LINK[ev.agent], 'flowing');
+      setNode(id, 'running', 'working…');
+      if (ev.agent === 'triage') {
+        setLink('lk-triage-tools', 'flowing');
+        setLink('lk-tools-triage', 'flowing');
+        $('tool-team').classList.add('active');
+        $('tool-hist').classList.add('active');
+      }
+    }
+  } else if (ev.type === 'done') {
+    const id = NODE_FOR_AGENT[ev.agent];
+    if (id) {
+      data[id].output = ev.output;
+      data[id].elapsed_ms = ev.elapsed_ms;
+      data[id].tokens = ev.tokens;
+      setNode(id, 'done', `${ev.elapsed_ms} ms`);
+      setLink(INCOMING_LINK[ev.agent], 'done');
+      if (ev.agent === 'analyzer') setLink('lk-analyzer-gate', 'flowing');
+      if (ev.agent === 'triage') {
+        $('tool-team').classList.remove('active');
+        $('tool-hist').classList.remove('active');
+        $('tool-team').classList.add('used');
+        $('tool-hist').classList.add('used');
+        setLink('lk-triage-tools', 'done');
+        setLink('lk-tools-triage', 'done');
+        // surface tool results on the tools node for inspection
+        data.tools.status = 'done';
+        data.tools.output = {
+          note: 'The actual tool call I/O is not exposed by the event stream; '
+              + 'see the triage agent\'s output for the choice it made.',
+        };
+      }
+    }
+  } else if (ev.type === 'failed') {
+    const id = NODE_FOR_AGENT[ev.agent];
+    if (id) {
+      data[id].error = ev.error;
+      data[id].elapsed_ms = ev.elapsed_ms;
+      setNode(id, 'failed', 'failed');
+      setLink(INCOMING_LINK[ev.agent], 'failed');
+    }
+  } else if (ev.type === 'gate') {
+    data.gate.output = { verdict: ev.verdict, blocking_fields: ev.blocking_fields };
+    if (ev.verdict === 'complete') {
+      setNode('gate', 'done', 'complete');
+      setLink('lk-analyzer-gate', 'done');
+      setLink('lk-gate-rule', 'flowing');
+    } else {
+      data.short.output = { verdict: ev.verdict, blocking_fields: ev.blocking_fields };
+      data.short.status = 'warn';
+      setNode('gate',  'warn', 'needs more info');
+      setLink('lk-analyzer-gate', 'warn');
+      setLink('lk-gate-short', 'warn');
+      setNode('short', 'warn', 'short-circuit');
+    }
+  } else if (ev.type === 'rule') {
+    data.rule.output = {
+      severity: ev.severity, priority: ev.priority,
+      rule_applied: ev.rule_applied, team: ev.team,
+    };
+    setNode('rule', 'done',
+      `${ev.severity} / ${ev.priority} — ${ev.team}`);
+    setLink('lk-gate-rule', 'done');
+  } else if (ev.type === 'pipeline_done') {
+    renderFinal(ev.final);
+  } else if (ev.type === 'pipeline_failed') {
+    renderFailure(ev.error);
+  }
+  if (selectedNode) renderInspector();
+}
+
+function renderFinal(final) {
+  $outputs.classList.remove('hidden');
+  const a = final.suggested_assignee;
+  const banner = final.status === 'Triaged'
+    ? `<div class="status-banner triaged">Status: Triaged · ${final.severity} / ${final.priority}</div>`
+    : `<div class="status-banner needs_info">Status: ${final.status}</div>`;
+  const kv = (k, v) => v == null || v === '' ? '' :
+    `<div class="k">${k}</div><div class="v">${v}</div>`;
+  const list = (k, arr) => !arr || !arr.length ? '' :
+    `<div class="k">${k}</div><div class="v">${arr.map(x => '• ' + escapeHtml(x)).join('<br>')}</div>`;
+  $outputs.innerHTML = `
+    ${banner}
+    <div class="kv">
+      ${kv('Bug ID', escapeHtml(final.bug_id))}
+      ${kv('Summary', escapeHtml(final.summary || ''))}
+      ${kv('Rule applied', escapeHtml(final.rule_applied || ''))}
+      ${kv('Owner team', escapeHtml(final.suggested_owner_team || ''))}
+      ${a ? kv('Assignee',
+        `${escapeHtml(a.name)} <span class="pill">${escapeHtml(a.id)}</span>` +
+        `<br><span style="color: var(--muted)">${escapeHtml(a.reason)}</span>`) : ''}
+      ${kv('Recommendation', escapeHtml(final.triage_recommendation || ''))}
+      ${list('Notify', (final.notify || []).map(n => `${n.name} (${n.role})`))}
+      ${list('Missing info', final.missing_information)}
+      ${list('Blocking', final.blocking_fields)}
+      ${list('Repro steps', final.suggested_repro_steps)}
+    </div>
+    ${final.artifacts ? `
+      <details open>
+        <summary>Artifacts</summary>
+        <h4>Jira ticket</h4>
+        <pre>${escapeHtml(final.artifacts.jira_ticket || '')}</pre>
+        <h4>Test cases</h4>
+        <pre>${escapeHtml((final.artifacts.test_cases || []).map(t => '• ' + t).join('\n'))}</pre>
+        <h4>Duplicate search</h4>
+        <pre>${escapeHtml(final.artifacts.duplicate_check_query || '')}</pre>
+        <h4>Handoff note</h4>
+        <pre>${escapeHtml(final.artifacts.handoff_note || '')}</pre>
+      </details>` : ''}
+  `;
+}
+
+function renderFailure(err) {
+  $outputs.classList.remove('hidden');
+  $outputs.innerHTML = `<div class="status-banner failed">Pipeline failed: ${escapeHtml(err)}</div>`;
+}
+
+// initial state
+resetData();
+
+$submit.addEventListener('click', async () => {
+  const raw = $bug.value.trim();
+  if (!raw) return;
+  resetGraph();
+  $submit.disabled = true;
+
+  try {
+    const resp = await fetch('/triage', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ bug_markdown: raw }),
+    });
+    if (!resp.ok) {
+      renderFailure(`HTTP ${resp.status}: ${await resp.text()}`);
+      return;
+    }
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let nl;
+      while ((nl = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, nl).trim();
+        buf = buf.slice(nl + 1);
+        if (line) {
+          try { handleEvent(JSON.parse(line)); }
+          catch (e) { console.error('bad event', line, e); }
+        }
+      }
+    }
+  } catch (e) {
+    renderFailure(`Client error: ${e.message}`);
+  } finally {
+    $submit.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

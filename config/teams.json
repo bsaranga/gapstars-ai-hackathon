@@ -1,0 +1,427 @@
+{
+  "version": 1,
+  "triage_lead_team_id": "triage",
+  "teams": [
+    {
+      "id": "identity",
+      "name": "Identity Team",
+      "areas": ["auth"],
+      "slack_channel": "#identity-bugs",
+      "jira_project": "IDP",
+      "escalation_contact_id": "tl-noor",
+      "developers": [
+        {
+          "id": "dev-priya",
+          "name": "Priya Raman",
+          "email": "priya@example.com",
+          "role": "Senior Engineer",
+          "skills": ["oauth", "oidc", "saml", "jwt", "auth", "go", "redis"],
+          "seniority": "senior",
+          "on_call": true,
+          "availability": "available",
+          "timezone": "Asia/Kolkata"
+        },
+        {
+          "id": "dev-marco",
+          "name": "Marco Bianchi",
+          "email": "marco@example.com",
+          "role": "Staff Engineer",
+          "skills": ["auth", "cryptography", "go", "kubernetes", "postgres"],
+          "seniority": "staff",
+          "on_call": false,
+          "availability": "available",
+          "timezone": "Europe/Rome"
+        },
+        {
+          "id": "dev-jin",
+          "name": "Jin Park",
+          "email": "jin@example.com",
+          "role": "Engineer",
+          "skills": ["auth", "session", "java", "spring"],
+          "seniority": "mid",
+          "on_call": false,
+          "availability": "limited",
+          "timezone": "Asia/Seoul"
+        }
+      ],
+      "stakeholders": [
+        {
+          "id": "pm-isla",
+          "name": "Isla Fernandez",
+          "email": "isla@example.com",
+          "role": "product_manager",
+          "notify_on": ["P0", "P1"]
+        },
+        {
+          "id": "tl-noor",
+          "name": "Noor Haddad",
+          "email": "noor@example.com",
+          "role": "tech_lead",
+          "notify_on": ["P0", "P1", "P2"]
+        }
+      ]
+    },
+    {
+      "id": "billing",
+      "name": "Billing Team",
+      "areas": ["payments"],
+      "slack_channel": "#billing-bugs",
+      "jira_project": "BILL",
+      "escalation_contact_id": "tl-carol",
+      "developers": [
+        {
+          "id": "dev-alice",
+          "name": "Alice Chen",
+          "email": "alice@example.com",
+          "role": "Senior Engineer",
+          "skills": ["stripe", "payments", "java", "kafka", "postgres", "webhooks", "idempotency"],
+          "seniority": "senior",
+          "on_call": true,
+          "availability": "available",
+          "timezone": "America/New_York"
+        },
+        {
+          "id": "dev-ben",
+          "name": "Ben Ortiz",
+          "email": "ben@example.com",
+          "role": "Engineer",
+          "skills": ["java", "spring", "payments", "rate-limiting"],
+          "seniority": "mid",
+          "on_call": false,
+          "availability": "available",
+          "timezone": "Europe/Berlin"
+        },
+        {
+          "id": "dev-soraya",
+          "name": "Soraya Khan",
+          "email": "soraya@example.com",
+          "role": "Junior Engineer",
+          "skills": ["java", "payments", "testing"],
+          "seniority": "junior",
+          "on_call": false,
+          "availability": "available",
+          "timezone": "Europe/London"
+        }
+      ],
+      "stakeholders": [
+        {
+          "id": "pm-dana",
+          "name": "Dana Park",
+          "email": "dana@example.com",
+          "role": "product_manager",
+          "notify_on": ["P0", "P1"]
+        },
+        {
+          "id": "tl-carol",
+          "name": "Carol Lee",
+          "email": "carol@example.com",
+          "role": "tech_lead",
+          "notify_on": ["P0", "P1", "P2"]
+        },
+        {
+          "id": "em-erik",
+          "name": "Erik Voss",
+          "email": "erik@example.com",
+          "role": "engineering_manager",
+          "notify_on": ["P0"]
+        }
+      ]
+    },
+    {
+      "id": "frontend",
+      "name": "Frontend Team",
+      "areas": ["ui"],
+      "slack_channel": "#frontend-bugs",
+      "jira_project": "WEB",
+      "escalation_contact_id": "tl-rafa",
+      "developers": [
+        {
+          "id": "dev-mei",
+          "name": "Mei Sato",
+          "email": "mei@example.com",
+          "role": "Senior Engineer",
+          "skills": ["react", "typescript", "css", "accessibility", "safari", "checkout"],
+          "seniority": "senior",
+          "on_call": true,
+          "availability": "available",
+          "timezone": "Asia/Tokyo"
+        },
+        {
+          "id": "dev-luca",
+          "name": "Luca Romano",
+          "email": "luca@example.com",
+          "role": "Engineer",
+          "skills": ["react", "typescript", "css", "animation"],
+          "seniority": "mid",
+          "on_call": false,
+          "availability": "available",
+          "timezone": "Europe/Madrid"
+        },
+        {
+          "id": "dev-yuki",
+          "name": "Yuki Tanaka",
+          "email": "yuki@example.com",
+          "role": "Junior Engineer",
+          "skills": ["react", "css", "testing"],
+          "seniority": "junior",
+          "on_call": false,
+          "availability": "available",
+          "timezone": "Asia/Tokyo"
+        },
+        {
+          "id": "dev-paula",
+          "name": "Paula Mendes",
+          "email": "paula@example.com",
+          "role": "Staff Engineer",
+          "skills": ["react", "typescript", "design-systems", "webpack", "performance"],
+          "seniority": "staff",
+          "on_call": false,
+          "availability": "out",
+          "timezone": "America/Sao_Paulo"
+        }
+      ],
+      "stakeholders": [
+        {
+          "id": "pm-omar",
+          "name": "Omar Said",
+          "email": "omar@example.com",
+          "role": "product_manager",
+          "notify_on": ["P0", "P1"]
+        },
+        {
+          "id": "tl-rafa",
+          "name": "Rafa Costa",
+          "email": "rafa@example.com",
+          "role": "tech_lead",
+          "notify_on": ["P0", "P1", "P2"]
+        }
+      ]
+    },
+    {
+      "id": "backend",
+      "name": "Backend / Platform",
+      "areas": ["api"],
+      "slack_channel": "#backend-bugs",
+      "jira_project": "API",
+      "escalation_contact_id": "tl-hugo",
+      "developers": [
+        {
+          "id": "dev-tomas",
+          "name": "Tomas Novak",
+          "email": "tomas@example.com",
+          "role": "Senior Engineer",
+          "skills": ["go", "grpc", "postgres", "api", "rest"],
+          "seniority": "senior",
+          "on_call": true,
+          "availability": "available",
+          "timezone": "Europe/Prague"
+        },
+        {
+          "id": "dev-amira",
+          "name": "Amira El-Sayed",
+          "email": "amira@example.com",
+          "role": "Engineer",
+          "skills": ["python", "fastapi", "api", "postgres"],
+          "seniority": "mid",
+          "on_call": false,
+          "availability": "available",
+          "timezone": "Africa/Cairo"
+        },
+        {
+          "id": "dev-finn",
+          "name": "Finn Walsh",
+          "email": "finn@example.com",
+          "role": "Engineer",
+          "skills": ["go", "api", "grpc", "tracing"],
+          "seniority": "mid",
+          "on_call": false,
+          "availability": "limited",
+          "timezone": "Europe/Dublin"
+        }
+      ],
+      "stakeholders": [
+        {
+          "id": "pm-vera",
+          "name": "Vera Ibrahim",
+          "email": "vera@example.com",
+          "role": "product_manager",
+          "notify_on": ["P0", "P1"]
+        },
+        {
+          "id": "tl-hugo",
+          "name": "Hugo Lindqvist",
+          "email": "hugo@example.com",
+          "role": "tech_lead",
+          "notify_on": ["P0", "P1", "P2"]
+        }
+      ]
+    },
+    {
+      "id": "data-platform",
+      "name": "Data Platform",
+      "areas": ["data"],
+      "slack_channel": "#data-bugs",
+      "jira_project": "DATA",
+      "escalation_contact_id": "tl-kenji",
+      "developers": [
+        {
+          "id": "dev-rohan",
+          "name": "Rohan Mehta",
+          "email": "rohan@example.com",
+          "role": "Senior Engineer",
+          "skills": ["spark", "airflow", "python", "postgres", "etl"],
+          "seniority": "senior",
+          "on_call": false,
+          "availability": "available",
+          "timezone": "Asia/Kolkata"
+        },
+        {
+          "id": "dev-eli",
+          "name": "Eli Roth",
+          "email": "eli@example.com",
+          "role": "Engineer",
+          "skills": ["python", "dbt", "snowflake", "etl"],
+          "seniority": "mid",
+          "on_call": true,
+          "availability": "available",
+          "timezone": "America/Los_Angeles"
+        }
+      ],
+      "stakeholders": [
+        {
+          "id": "tl-kenji",
+          "name": "Kenji Watanabe",
+          "email": "kenji@example.com",
+          "role": "tech_lead",
+          "notify_on": ["P0", "P1", "P2"]
+        },
+        {
+          "id": "qa-lopez",
+          "name": "Maria Lopez",
+          "email": "lopez@example.com",
+          "role": "qa_lead",
+          "notify_on": ["P0", "P1"]
+        }
+      ]
+    },
+    {
+      "id": "sre",
+      "name": "DevOps / SRE",
+      "areas": ["infra"],
+      "slack_channel": "#sre-bugs",
+      "jira_project": "INFRA",
+      "escalation_contact_id": "tl-greta",
+      "developers": [
+        {
+          "id": "dev-anya",
+          "name": "Anya Volkov",
+          "email": "anya@example.com",
+          "role": "Senior SRE",
+          "skills": ["kubernetes", "terraform", "aws", "linux", "networking"],
+          "seniority": "senior",
+          "on_call": true,
+          "availability": "available",
+          "timezone": "Europe/Warsaw"
+        },
+        {
+          "id": "dev-malik",
+          "name": "Malik Johnson",
+          "email": "malik@example.com",
+          "role": "SRE",
+          "skills": ["kubernetes", "prometheus", "grafana", "aws"],
+          "seniority": "mid",
+          "on_call": false,
+          "availability": "available",
+          "timezone": "America/Chicago"
+        }
+      ],
+      "stakeholders": [
+        {
+          "id": "tl-greta",
+          "name": "Greta Schneider",
+          "email": "greta@example.com",
+          "role": "tech_lead",
+          "notify_on": ["P0", "P1", "P2"]
+        },
+        {
+          "id": "oc-shift",
+          "name": "Primary On-Call",
+          "email": "oncall@example.com",
+          "role": "oncall",
+          "notify_on": ["P0"]
+        }
+      ]
+    },
+    {
+      "id": "performance",
+      "name": "Performance Working Group",
+      "areas": ["performance"],
+      "slack_channel": "#perf-bugs",
+      "jira_project": "PERF",
+      "escalation_contact_id": "tl-elena",
+      "developers": [
+        {
+          "id": "dev-sasha",
+          "name": "Sasha Petrov",
+          "email": "sasha@example.com",
+          "role": "Staff Engineer",
+          "skills": ["performance", "profiling", "go", "java", "tracing"],
+          "seniority": "staff",
+          "on_call": false,
+          "availability": "available",
+          "timezone": "Europe/Belgrade"
+        },
+        {
+          "id": "dev-omari",
+          "name": "Omari Bell",
+          "email": "omari@example.com",
+          "role": "Senior Engineer",
+          "skills": ["performance", "javascript", "react", "webpack"],
+          "seniority": "senior",
+          "on_call": true,
+          "availability": "available",
+          "timezone": "America/New_York"
+        }
+      ],
+      "stakeholders": [
+        {
+          "id": "tl-elena",
+          "name": "Elena Marin",
+          "email": "elena@example.com",
+          "role": "tech_lead",
+          "notify_on": ["P0", "P1", "P2"]
+        }
+      ]
+    },
+    {
+      "id": "triage",
+      "name": "Triage Lead",
+      "areas": ["other"],
+      "slack_channel": "#triage",
+      "jira_project": "TRI",
+      "escalation_contact_id": "tl-ada",
+      "developers": [
+        {
+          "id": "dev-ada",
+          "name": "Ada Okafor",
+          "email": "ada.triage@example.com",
+          "role": "Triage Engineer",
+          "skills": ["triage", "qa", "investigation"],
+          "seniority": "senior",
+          "on_call": true,
+          "availability": "available",
+          "timezone": "Europe/London"
+        }
+      ],
+      "stakeholders": [
+        {
+          "id": "tl-ada",
+          "name": "Ada Okafor (TL)",
+          "email": "ada.tl@example.com",
+          "role": "tech_lead",
+          "notify_on": ["P0", "P1", "P2", "P3"]
+        }
+      ]
+    }
+  ]
+}
