@@ -117,11 +117,27 @@
 
         <div class="relative z-10 w-full max-w-2xl overflow-hidden rounded-xl border border-slate-200 bg-white p-8 shadow-lg">
           <div class="mb-8 text-center">
-            <div class="relative mb-6 inline-flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 text-blue-700">
-              <span class="material-symbols-outlined animate-spin text-[32px]" style="animation-duration:3000ms;">sync</span>
+            <div id="progress-icon-wrap" class="relative mb-6 inline-flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 text-blue-700">
+              <span id="progress-icon" class="material-symbols-outlined animate-spin text-[32px]" style="animation-duration:3000ms;">sync</span>
             </div>
-            <h1 class="mb-1 text-2xl font-semibold text-slate-900">Processing Bug Report</h1>
+            <h1 id="progress-title" class="mb-1 text-2xl font-semibold text-slate-900">Processing Bug Report</h1>
             <p id="status-message" class="mx-auto max-w-md text-sm text-slate-500">Initiating intelligent diagnostic workflow…</p>
+            <div id="missing-info-box" class="hidden mx-auto mt-4 max-w-md rounded-lg border border-amber-300 bg-amber-50 p-4 text-left text-amber-900">
+              <p class="mb-2 flex items-center gap-2 text-xs font-semibold uppercase">
+                <span class="material-symbols-outlined text-[18px]">warning</span> Triage short-circuited — missing information
+              </p>
+              <p class="mb-3 text-xs text-amber-800">
+                The analyser could not proceed because the bug report is missing
+                fields it needs to assign severity / priority. No triage was performed.
+              </p>
+              <ul id="missing-info-list" class="space-y-1 text-sm pl-1"></ul>
+              <div class="mt-4 flex justify-end">
+                <button id="edit-resubmit-btn"
+                  class="rounded-md bg-amber-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-amber-700">
+                  Edit &amp; Resubmit
+                </button>
+              </div>
+            </div>
           </div>
 
           <div class="relative mb-8 h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
@@ -359,6 +375,23 @@
       badge.classList.add('text-emerald-600');
     }
 
+    function setSkipped(key) {
+      const el = document.getElementById(`step-${key}`);
+      if (!el) return;
+      el.classList.remove('bg-blue-50','border-blue-200','bg-slate-50','bg-white');
+      el.classList.add('bg-slate-100','border-slate-200','opacity-50');
+      const icon = el.querySelector('.step-icon');
+      icon.classList.remove('bg-blue-600','bg-emerald-600','bg-red-600');
+      icon.classList.add('bg-slate-300','text-slate-500');
+      icon.innerHTML = '<span class="material-symbols-outlined text-[20px]">do_not_disturb_on</span>';
+      const pulse = el.querySelector('.step-pulse');
+      if (pulse) pulse.remove();
+      const badge = document.getElementById(`badge-${key}`);
+      badge.innerText = 'Skipped';
+      badge.classList.remove('text-blue-600','text-emerald-600','text-red-600');
+      badge.classList.add('text-slate-500');
+    }
+
     function setFailed(key) {
       const el = document.getElementById(`step-${key}`);
       if (!el) return;
@@ -489,8 +522,93 @@
       artifact: 'Artifact Generator drafting Jira ticket and tests…',
     };
 
+    // Track short-circuit state for the current run.
+    let shortCircuited = false;
+    // Deduped accumulator of missing/blocking fields so `applyShortCircuit`
+    // can be called multiple times (gate event, then pipeline_done) and
+    // each call adds to the list without losing earlier entries.
+    const missingFields = new Map();   // key: `${kind}::${text}` → { kind, text }
+
+    function renderMissingFields() {
+      const list = document.getElementById('missing-info-list');
+      const items = Array.from(missingFields.values());
+      if (items.length === 0) {
+        list.innerHTML = '<li class="italic text-amber-800/80">(no specific fields cited by the analyser)</li>';
+        return;
+      }
+      list.innerHTML = items.map(i => `
+        <li class="flex items-start gap-2">
+          <span class="material-symbols-outlined mt-0.5 text-[14px]">${i.kind === 'blocking' ? 'block' : 'help'}</span>
+          <span><strong class="font-semibold">${i.kind === 'blocking' ? 'Blocking:' : 'Missing:'}</strong> ${escapeHtml(i.text)}</span>
+        </li>`).join('');
+    }
+
+    function applyShortCircuit(blockingFields = [], missingInfo = []) {
+      // Always accumulate any new fields, even on repeated calls.
+      (blockingFields || []).forEach(f => {
+        if (f) missingFields.set(`blocking::${f}`, { kind: 'blocking', text: f });
+      });
+      (missingInfo || []).forEach(f => {
+        if (f) missingFields.set(`missing::${f}`,  { kind: 'missing',  text: f });
+      });
+      renderMissingFields();
+      document.getElementById('missing-info-box').classList.remove('hidden');
+
+      if (shortCircuited) return;
+      shortCircuited = true;
+
+      // Mark downstream agents as skipped.
+      ['triage', 'artifact'].forEach(setSkipped);
+
+      // Re-style the spinner / progress bar to a "stopped" state.
+      const wrap = document.getElementById('progress-icon-wrap');
+      wrap.classList.remove('bg-blue-100','text-blue-700');
+      wrap.classList.add('bg-amber-100','text-amber-700');
+      const icon = document.getElementById('progress-icon');
+      icon.classList.remove('animate-spin');
+      icon.innerText = 'pause_circle';
+      document.getElementById('progress-title').innerText =
+        'Triage short-circuited';
+
+      const bar = document.getElementById('main-progress-bar');
+      bar.style.width = '100%';
+      bar.classList.remove('bg-blue-600');
+      bar.classList.add('bg-amber-500');
+
+      document.getElementById('status-message').innerText =
+        'The analyser flagged the report as incomplete. The pipeline stopped before triage and no bug was created.';
+    }
+
+    function resetProgressChrome() {
+      shortCircuited = false;
+      missingFields.clear();
+      const wrap = document.getElementById('progress-icon-wrap');
+      wrap.classList.remove('bg-amber-100','text-amber-700');
+      wrap.classList.add('bg-blue-100','text-blue-700');
+      const icon = document.getElementById('progress-icon');
+      icon.classList.add('animate-spin');
+      icon.innerText = 'sync';
+      document.getElementById('progress-title').innerText = 'Processing Bug Report';
+      const bar = document.getElementById('main-progress-bar');
+      bar.classList.remove('bg-amber-500');
+      bar.classList.add('bg-blue-600');
+      document.getElementById('missing-info-box').classList.add('hidden');
+      document.getElementById('missing-info-list').innerHTML = '';
+    }
+
+    // "Edit & Resubmit" — clears the viewed-run sessionStorage so the
+    // user returns to a fresh form. We deliberately do not prefill the
+    // textarea because the original markdown is still on the server and
+    // the user is expected to add the missing fields locally.
+    document.getElementById('edit-resubmit-btn').addEventListener('click', () => {
+      forgetJob();
+      document.getElementById('markdown-report').value = '';
+      showView('add');
+    });
+
     // ===== Streaming via shared job store =====
     async function consumeStream(jobId) {
+      resetProgressChrome();
       renderSteps();
       setProgress(5, 'Connecting to triage job…');
       showView('progress');
@@ -519,6 +637,22 @@
         }
       } catch (err) {
         document.getElementById('status-message').innerText = 'Error: ' + err.message;
+        return;
+      }
+
+      // A short-circuited run still emits pipeline_done, but the user
+      // must stay on the steps view rather than being taken to the
+      // bug-summary screen. We check BOTH the in-flight flag and the
+      // final report status (replay-from-DB may not see `gate` first).
+      const isShortCircuit =
+        shortCircuited ||
+        (finalReport && finalReport.status === 'Needs More Information');
+
+      if (isShortCircuit) {
+        applyShortCircuit(
+          finalReport ? finalReport.blocking_fields : [],
+          finalReport ? finalReport.missing_information : [],
+        );
         return;
       }
 
@@ -590,8 +724,7 @@
           break;
         case 'gate':
           if (ev.verdict === 'needs_more_info') {
-            document.getElementById('status-message').innerText =
-              'Analyser flagged missing info — skipping remaining agents.';
+            applyShortCircuit(ev.blocking_fields, []);
           }
           break;
         case 'rule':
