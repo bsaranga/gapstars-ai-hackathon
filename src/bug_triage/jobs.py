@@ -73,11 +73,16 @@ class JobStore:
         self._jobs: dict[str, Job] = {}
         self.current_id: str | None = None
 
-    def start(self, bug_markdown: str, deps: TriageDeps) -> Job:
+    def start(
+        self,
+        bug_markdown: str,
+        deps: TriageDeps,
+        project_id: int | None = None,
+    ) -> Job:
         job = Job(uuid.uuid4().hex, bug_markdown)
         self._jobs[job.id] = job
         self.current_id = job.id
-        db.insert_run(job.id, bug_markdown)
+        db.insert_run(job.id, bug_markdown, project_id=project_id)
         job.task = asyncio.create_task(job.run(deps))
         return job
 

@@ -33,9 +33,8 @@
       <div class="flex items-center gap-8">
         <span class="text-xl font-extrabold tracking-tight text-blue-700">IssueTrack</span>
         <nav class="hidden md:flex items-center gap-6 h-full">
-          <a href="#" class="flex items-center h-full px-2 text-sm font-semibold text-slate-600 hover:text-slate-900 transition">Projects</a>
-          <a href="#" class="flex items-center h-full px-2 text-sm font-semibold text-blue-700 border-b-2 border-blue-700">Issues</a>
-          <a href="/dashboard" class="flex items-center h-full px-2 text-sm font-semibold text-slate-600 hover:text-slate-900 transition">Dashboard</a>
+          <a id="nav-projects" href="#projects" class="nav-link flex items-center h-full px-2 text-sm font-semibold text-slate-600 hover:text-slate-900 transition">Projects</a>
+          <a id="nav-issues"   href="#backlog"  class="nav-link flex items-center h-full px-2 text-sm font-semibold text-slate-600 hover:text-slate-900 transition">Issues</a>
         </nav>
       </div>
       <div class="flex items-center gap-4">
@@ -46,16 +45,20 @@
 
   <!-- Side navigation -->
   <aside class="fixed left-0 top-14 hidden md:flex h-[calc(100vh-3.5rem)] w-60 flex-col gap-1 border-r border-slate-200 bg-white p-4">
-    <div class="mb-4 flex items-center gap-3 p-2">
-      <div class="flex h-8 w-8 items-center justify-center rounded bg-blue-600 font-bold text-white">CI</div>
-      <div>
-        <h3 class="text-base font-semibold leading-tight">Cloud Infrastructure</h3>
-        <p class="text-xs text-slate-500">Software Project</p>
+    <button id="active-project-card"
+            class="mb-4 flex w-full items-center gap-3 rounded-md p-2 text-left hover:bg-slate-100 transition"
+            title="Switch project">
+      <div id="active-project-key"
+           class="flex h-8 w-8 items-center justify-center rounded bg-slate-300 font-bold text-white">—</div>
+      <div class="min-w-0">
+        <h3 id="active-project-name" class="truncate text-base font-semibold leading-tight">No project</h3>
+        <p class="text-xs text-slate-500">Click to switch</p>
       </div>
-    </div>
+    </button>
     <nav class="flex flex-col gap-1">
-      <a href="#" class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"><span class="material-symbols-outlined">list</span><span>Backlog</span></a>
-      <a href="#" class="flex items-center gap-3 rounded-md bg-blue-100 px-3 py-2 text-sm font-bold text-blue-800"><span class="material-symbols-outlined">bug_report</span><span>Issues</span></a>
+      <a id="side-backlog" href="#backlog" class="side-link flex items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"><span class="material-symbols-outlined">list</span><span>Backlog</span></a>
+      <a id="side-create"  href="#create"  class="side-link flex items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"><span class="material-symbols-outlined">add_circle</span><span>Triage New</span></a>
+      <a id="side-projects" href="#projects" class="side-link flex items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"><span class="material-symbols-outlined">folder</span><span>Projects</span></a>
       <a href="/dashboard" class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"><span class="material-symbols-outlined">analytics</span><span>Pipeline View</span></a>
     </nav>
   </aside>
@@ -67,9 +70,9 @@
       <div class="mx-auto max-w-3xl px-6 py-8">
         <div class="mb-6">
           <div class="mb-2 flex items-center gap-1 text-xs font-semibold text-slate-500">
-            <span>Projects</span>
+            <a href="#projects" class="hover:text-slate-700">Projects</a>
             <span class="material-symbols-outlined text-[14px]">chevron_right</span>
-            <span>Cloud Infrastructure</span>
+            <span id="add-breadcrumb-project">—</span>
             <span class="material-symbols-outlined text-[14px]">chevron_right</span>
             <span class="font-bold text-blue-700">Create Bug</span>
           </div>
@@ -79,13 +82,19 @@
           </div>
         </div>
 
+        <div id="no-project-banner"
+             class="mb-4 hidden rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          You need to <a href="#projects" class="font-semibold underline">create or select a project</a> before triaging an issue.
+        </div>
+
         <div class="form-container rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <form id="bug-form" class="space-y-6">
             <fieldset class="border-b border-slate-200 pb-4">
               <legend class="mb-1.5 block text-xs font-semibold text-slate-500">Project</legend>
               <div class="flex w-fit items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-                <div class="flex h-5 w-5 items-center justify-center rounded bg-blue-600 text-[10px] font-bold text-white">CI</div>
-                <span class="text-sm text-slate-900">Cloud Infrastructure</span>
+                <div id="add-form-project-key"
+                     class="flex h-5 w-5 items-center justify-center rounded bg-slate-300 text-[10px] font-bold text-white">—</div>
+                <span id="add-form-project-name" class="text-sm text-slate-900">No project selected</span>
               </div>
             </fieldset>
 
@@ -170,7 +179,7 @@
           </div>
           <div class="flex items-center gap-2">
             <button id="back-btn" class="rounded-md bg-slate-100 px-6 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-200">Triage Another</button>
-            <button class="rounded-md bg-blue-600 px-6 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">Confirm &amp; Create Issue</button>
+            <button id="confirm-create-btn" class="rounded-md bg-blue-600 px-6 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">Confirm &amp; Create Issue</button>
           </div>
         </header>
 
@@ -271,6 +280,102 @@
       </div>
     </section>
 
+    <!-- ============ VIEW 4: PROJECTS ============ -->
+    <section id="view-projects" class="hidden-view">
+      <div class="mx-auto max-w-4xl px-6 py-8">
+        <header class="mb-6 flex items-end justify-between">
+          <div>
+            <h1 class="text-2xl font-semibold text-slate-900">Projects</h1>
+            <p class="mt-1 text-sm text-slate-500">Create a project and select it to scope triage runs.</p>
+          </div>
+        </header>
+
+        <div class="form-container rounded-xl border border-slate-200 bg-white p-6 shadow-sm mb-6">
+          <form id="project-form" class="space-y-4">
+            <h2 class="text-base font-semibold text-slate-900">New Project</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div class="md:col-span-2 space-y-1">
+                <label class="block text-xs font-semibold text-slate-500" for="proj-name">Name</label>
+                <input id="proj-name" type="text" required maxlength="80"
+                       placeholder="Cloud Infrastructure"
+                       class="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
+              </div>
+              <div class="space-y-1">
+                <label class="block text-xs font-semibold text-slate-500" for="proj-key">Key (optional)</label>
+                <input id="proj-key" type="text" maxlength="4" placeholder="auto"
+                       class="w-full uppercase rounded-md border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
+              </div>
+            </div>
+            <div class="space-y-1">
+              <label class="block text-xs font-semibold text-slate-500" for="proj-desc">Description</label>
+              <textarea id="proj-desc" rows="2"
+                        class="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"></textarea>
+            </div>
+            <div id="project-form-error" class="hidden text-sm text-red-600"></div>
+            <div class="flex justify-end">
+              <button type="submit"
+                      class="rounded-md bg-blue-600 px-6 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+                Create Project
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <h2 class="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">All Projects</h2>
+        <div id="projects-list" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div class="empty col-span-full rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
+            No projects yet — create one above.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ VIEW 5: BACKLOG ============ -->
+    <section id="view-backlog" class="hidden-view">
+      <div class="mx-auto max-w-6xl px-6 py-8">
+        <header class="mb-6 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div>
+            <div class="mb-1 flex items-center gap-1 text-xs font-semibold text-slate-500">
+              <a href="#projects" class="hover:text-slate-700">Projects</a>
+              <span class="material-symbols-outlined text-[14px]">chevron_right</span>
+              <span id="backlog-breadcrumb-project">—</span>
+              <span class="material-symbols-outlined text-[14px]">chevron_right</span>
+              <span class="font-bold text-blue-700">Backlog</span>
+            </div>
+            <h1 class="text-2xl font-semibold text-slate-900">Backlog</h1>
+            <p class="mt-1 text-sm text-slate-500">Triaged issues created in this project.</p>
+          </div>
+          <button id="backlog-new-btn"
+                  class="rounded-md bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+            + Triage New Issue
+          </button>
+        </header>
+
+        <div id="backlog-empty"
+             class="hidden rounded-lg border border-dashed border-slate-300 bg-white p-12 text-center">
+          <span class="material-symbols-outlined text-[40px] text-slate-300">inbox</span>
+          <p class="mt-2 text-sm text-slate-500">No issues yet. Triage a bug and confirm it to populate the backlog.</p>
+        </div>
+
+        <div id="backlog-table-wrap" class="hidden overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-slate-50 text-xs uppercase text-slate-500">
+              <tr>
+                <th class="px-4 py-3 font-semibold">Key</th>
+                <th class="px-4 py-3 font-semibold">Title</th>
+                <th class="px-4 py-3 font-semibold">Severity</th>
+                <th class="px-4 py-3 font-semibold">Priority</th>
+                <th class="px-4 py-3 font-semibold">Team</th>
+                <th class="px-4 py-3 font-semibold">Assignee</th>
+                <th class="px-4 py-3 font-semibold">Created</th>
+              </tr>
+            </thead>
+            <tbody id="backlog-rows" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
   </main>
 
   <script>
@@ -279,11 +384,44 @@
       add:      document.getElementById('view-add'),
       progress: document.getElementById('view-progress'),
       summary:  document.getElementById('view-summary'),
+      projects: document.getElementById('view-projects'),
+      backlog:  document.getElementById('view-backlog'),
+    };
+    // Sidebar / top-nav links → view they switch to (used to highlight active).
+    const NAV_FOR_VIEW = {
+      projects: ['nav-projects', 'side-projects'],
+      backlog:  ['nav-issues',   'side-backlog'],
+      add:      ['side-create'],
+      progress: ['side-create'],
+      summary:  ['side-create'],
     };
     function showView(name) {
       for (const [k, el] of Object.entries(views)) {
         el.classList.toggle('hidden-view', k !== name);
       }
+      // Highlight active nav links.
+      document.querySelectorAll('.nav-link').forEach(el => {
+        el.classList.remove('text-blue-700','border-b-2','border-blue-700');
+        el.classList.add('text-slate-600');
+      });
+      document.querySelectorAll('.side-link').forEach(el => {
+        el.classList.remove('bg-blue-100','text-blue-800','font-bold');
+        el.classList.add('text-slate-600','font-semibold');
+      });
+      (NAV_FOR_VIEW[name] || []).forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (el.classList.contains('nav-link')) {
+          el.classList.remove('text-slate-600');
+          el.classList.add('text-blue-700','border-b-2','border-blue-700');
+        } else {
+          el.classList.remove('text-slate-600','font-semibold');
+          el.classList.add('bg-blue-100','text-blue-800','font-bold');
+        }
+      });
+      // Refresh view-specific data.
+      if (name === 'projects') refreshProjects();
+      if (name === 'backlog')  refreshBacklog();
     }
 
     // ===== Per-tab continuity =====
@@ -522,6 +660,10 @@
       artifact: 'Artifact Generator drafting Jira ticket and tests…',
     };
 
+    // Active project and current job id are needed across handlers.
+    let activeProject = null;   // { id, name, key, description } or null
+    let currentJobId = null;
+
     // Track short-circuit state for the current run.
     let shortCircuited = false;
     // Deduped accumulator of missing/blocking fields so `applyShortCircuit`
@@ -608,6 +750,7 @@
 
     // ===== Streaming via shared job store =====
     async function consumeStream(jobId) {
+      currentJobId = jobId;
       resetProgressChrome();
       renderSteps();
       setProgress(5, 'Connecting to triage job…');
@@ -667,13 +810,18 @@
       e.preventDefault();
       const md = document.getElementById('markdown-report').value.trim();
       if (!md) return;
+      if (!activeProject) {
+        alert('Select a project first.');
+        showView('projects');
+        return;
+      }
 
       let jobId;
       try {
         const r = await fetch('/triage', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ bug_markdown: md }),
+          body: JSON.stringify({ bug_markdown: md, project_id: activeProject.id }),
         });
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         jobId = (await r.json()).job_id;
@@ -681,18 +829,270 @@
         alert('Failed to start triage: ' + err.message);
         return;
       }
+      currentJobId = jobId;
       rememberJob(jobId);
       consumeStream(jobId);
     });
 
-    // On load:
-    //   1. If this tab was already viewing a run, re-attach to it.
-    //      `consumeStream` works for both live and finished runs (the
-    //      server falls back to DB replay for jobs no longer in memory).
-    //   2. Otherwise, if a different tab has a triage in flight, attach
-    //      to that so the user lands directly on the progress view.
-    //   3. Otherwise, stay on the form.
-    (async () => {
+
+    // ===================================================================
+    // Project + Backlog state and wiring
+    // ===================================================================
+    const PROJECT_KEY = 'bt.activeProjectId';
+    let allProjects = [];
+
+    function setActiveProject(proj) {
+      activeProject = proj || null;
+      try {
+        if (proj) localStorage.setItem(PROJECT_KEY, String(proj.id));
+        else localStorage.removeItem(PROJECT_KEY);
+      } catch (_) { /* ignore storage errors */ }
+      renderActiveProjectChrome();
+    }
+
+    function renderActiveProjectChrome() {
+      const keyEl  = document.getElementById('active-project-key');
+      const nameEl = document.getElementById('active-project-name');
+      const formKeyEl  = document.getElementById('add-form-project-key');
+      const formNameEl = document.getElementById('add-form-project-name');
+      const crumbEl    = document.getElementById('add-breadcrumb-project');
+      const backCrumb  = document.getElementById('backlog-breadcrumb-project');
+      const banner = document.getElementById('no-project-banner');
+      const submitBtn = document.getElementById('submit-btn');
+
+      if (activeProject) {
+        keyEl.textContent = activeProject.key;
+        keyEl.classList.remove('bg-slate-300');
+        keyEl.classList.add('bg-blue-600');
+        nameEl.textContent = activeProject.name;
+
+        formKeyEl.textContent = activeProject.key;
+        formKeyEl.classList.remove('bg-slate-300');
+        formKeyEl.classList.add('bg-blue-600');
+        formNameEl.textContent = activeProject.name;
+
+        crumbEl.textContent   = activeProject.name;
+        backCrumb.textContent = activeProject.name;
+        banner.classList.add('hidden');
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-50','cursor-not-allowed');
+      } else {
+        keyEl.textContent = '—';
+        keyEl.classList.add('bg-slate-300');
+        keyEl.classList.remove('bg-blue-600');
+        nameEl.textContent = 'No project';
+
+        formKeyEl.textContent = '—';
+        formKeyEl.classList.add('bg-slate-300');
+        formKeyEl.classList.remove('bg-blue-600');
+        formNameEl.textContent = 'No project selected';
+
+        crumbEl.textContent   = '—';
+        backCrumb.textContent = '—';
+        banner.classList.remove('hidden');
+        submitBtn.disabled = true;
+        submitBtn.classList.add('opacity-50','cursor-not-allowed');
+      }
+    }
+
+    async function loadProjects() {
+      try {
+        const r = await fetch('/projects');
+        if (!r.ok) return [];
+        const { projects } = await r.json();
+        allProjects = projects || [];
+      } catch (_) {
+        allProjects = [];
+      }
+      return allProjects;
+    }
+
+    function renderProjectsList() {
+      const root = document.getElementById('projects-list');
+      if (!allProjects.length) {
+        root.innerHTML = `
+          <div class="col-span-full rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
+            No projects yet — create one above.
+          </div>`;
+        return;
+      }
+      root.innerHTML = allProjects.map(p => {
+        const isActive = activeProject && p.id === activeProject.id;
+        return `
+          <div class="rounded-xl border ${isActive ? 'border-blue-500 ring-1 ring-blue-200 bg-blue-50' : 'border-slate-200 bg-white'} p-4 transition">
+            <div class="flex items-center gap-3">
+              <div class="flex h-10 w-10 items-center justify-center rounded bg-blue-600 font-bold text-white">${escapeHtml(p.key)}</div>
+              <div class="min-w-0">
+                <h3 class="truncate text-base font-semibold text-slate-900">${escapeHtml(p.name)}</h3>
+                <p class="truncate text-xs text-slate-500">${escapeHtml(p.description || 'Software Project')}</p>
+              </div>
+            </div>
+            <div class="mt-3 flex gap-2">
+              ${isActive
+                ? '<span class="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">Selected</span>'
+                : `<button data-select-id="${p.id}" class="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700">Select</button>`}
+              <button data-view-backlog="${p.id}" class="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">View backlog</button>
+            </div>
+          </div>`;
+      }).join('');
+      root.querySelectorAll('[data-select-id]').forEach(b => {
+        b.addEventListener('click', () => {
+          const id = Number(b.getAttribute('data-select-id'));
+          const proj = allProjects.find(x => x.id === id);
+          if (proj) setActiveProject(proj);
+          renderProjectsList();
+        });
+      });
+      root.querySelectorAll('[data-view-backlog]').forEach(b => {
+        b.addEventListener('click', () => {
+          const id = Number(b.getAttribute('data-view-backlog'));
+          const proj = allProjects.find(x => x.id === id);
+          if (proj) setActiveProject(proj);
+          showView('backlog');
+        });
+      });
+    }
+
+    async function refreshProjects() {
+      await loadProjects();
+      renderProjectsList();
+    }
+
+    document.getElementById('project-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('proj-name').value.trim();
+      const key  = document.getElementById('proj-key').value.trim();
+      const desc = document.getElementById('proj-desc').value.trim();
+      const errEl = document.getElementById('project-form-error');
+      errEl.classList.add('hidden');
+      try {
+        const r = await fetch('/projects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, key: key || null, description: desc || null }),
+        });
+        if (!r.ok) {
+          const detail = (await r.json().catch(() => ({}))).detail || `HTTP ${r.status}`;
+          throw new Error(detail);
+        }
+        const proj = await r.json();
+        setActiveProject(proj);
+        document.getElementById('proj-name').value = '';
+        document.getElementById('proj-key').value  = '';
+        document.getElementById('proj-desc').value = '';
+        await refreshProjects();
+      } catch (err) {
+        errEl.textContent = String(err.message || err);
+        errEl.classList.remove('hidden');
+      }
+    });
+
+    // ----- Backlog -----
+    function badgeSev(sev) {
+      const cls = { Critical:'bg-red-100 text-red-800', High:'bg-red-100 text-red-700',
+                    Medium:'bg-amber-100 text-amber-800', Low:'bg-emerald-100 text-emerald-800' };
+      return `<span class="rounded-full px-2 py-0.5 text-xs font-semibold ${cls[sev] || 'bg-slate-100 text-slate-700'}">${escapeHtml(sev || '—')}</span>`;
+    }
+    function badgePri(pri) {
+      const cls = { P0:'bg-red-600 text-white', P1:'bg-orange-600 text-white',
+                    P2:'bg-amber-500 text-white', P3:'bg-slate-400 text-white' };
+      return `<span class="rounded-full px-2 py-0.5 text-xs font-semibold ${cls[pri] || 'bg-slate-200 text-slate-700'}">${escapeHtml(pri || '—')}</span>`;
+    }
+
+    async function refreshBacklog() {
+      const empty = document.getElementById('backlog-empty');
+      const wrap  = document.getElementById('backlog-table-wrap');
+      const rows  = document.getElementById('backlog-rows');
+      rows.innerHTML = '';
+      if (!activeProject) {
+        empty.classList.remove('hidden');
+        empty.innerHTML = '<p class="text-sm text-slate-500">Select a project from <a href="#projects" class="text-blue-700 font-semibold">Projects</a> to view its backlog.</p>';
+        wrap.classList.add('hidden');
+        return;
+      }
+      let issues = [];
+      try {
+        const r = await fetch(`/issues?project_id=${activeProject.id}`);
+        if (r.ok) issues = (await r.json()).issues || [];
+      } catch (_) { /* ignore */ }
+
+      if (!issues.length) {
+        empty.classList.remove('hidden');
+        empty.innerHTML = '<span class="material-symbols-outlined text-[40px] text-slate-300">inbox</span>' +
+          '<p class="mt-2 text-sm text-slate-500">No issues yet. Triage a bug and confirm it to populate the backlog.</p>';
+        wrap.classList.add('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+      wrap.classList.remove('hidden');
+      rows.innerHTML = issues.map(i => {
+        const when = new Date((i.created_at || 0) * 1000)
+          .toLocaleString(undefined, { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+        return `<tr class="hover:bg-slate-50">
+          <td class="px-4 py-3 font-mono text-xs text-slate-500">${escapeHtml(i.bug_id || `#${i.id}`)}</td>
+          <td class="px-4 py-3 font-medium text-slate-900">${escapeHtml(i.title || '')}</td>
+          <td class="px-4 py-3">${badgeSev(i.severity)}</td>
+          <td class="px-4 py-3">${badgePri(i.priority)}</td>
+          <td class="px-4 py-3 text-slate-700">${escapeHtml(i.team || '—')}</td>
+          <td class="px-4 py-3 text-slate-700">${escapeHtml(i.assignee || '—')}</td>
+          <td class="px-4 py-3 text-xs text-slate-500">${escapeHtml(when)}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    // ----- Confirm & Create Issue -----
+    document.getElementById('confirm-create-btn').addEventListener('click', async () => {
+      if (!activeProject || !currentJobId) {
+        alert('Missing project or run context.');
+        return;
+      }
+      try {
+        const r = await fetch('/issues', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ project_id: activeProject.id, job_id: currentJobId }),
+        });
+        if (!r.ok) {
+          const detail = (await r.json().catch(() => ({}))).detail || `HTTP ${r.status}`;
+          throw new Error(detail);
+        }
+        forgetJob();
+        currentJobId = null;
+        await refreshBacklog();
+        showView('backlog');
+      } catch (err) {
+        alert('Failed to create issue: ' + err.message);
+      }
+    });
+
+    // ----- Navigation -----
+    function bindNav(id, view) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('click', (e) => { e.preventDefault(); showView(view); });
+    }
+    bindNav('nav-projects',  'projects');
+    bindNav('nav-issues',    'backlog');
+    bindNav('side-backlog',  'backlog');
+    bindNav('side-create',   'add');
+    bindNav('side-projects', 'projects');
+    document.getElementById('active-project-card').addEventListener('click', () => showView('projects'));
+    document.getElementById('backlog-new-btn').addEventListener('click', () => showView('add'));
+
+    // ===================================================================
+    // Bootstrap
+    // ===================================================================
+    async function bootstrap() {
+      await loadProjects();
+      let storedId = null;
+      try { storedId = localStorage.getItem(PROJECT_KEY); } catch (_) { /* ignore */ }
+      const stored = storedId ? allProjects.find(p => String(p.id) === String(storedId)) : null;
+      if (stored) setActiveProject(stored);
+      else if (allProjects.length) setActiveProject(allProjects[0]);
+      else setActiveProject(null);
+      renderProjectsList();
+
+      // Resume an in-flight (or last-viewed) run if any.
       const recalled = recalledJob();
       if (recalled) {
         consumeStream(recalled);
@@ -700,13 +1100,21 @@
       }
       try {
         const r = await fetch('/triage/current');
-        if (!r.ok) return;
-        const { job_id } = await r.json();
-        if (!job_id) return;
-        rememberJob(job_id);
-        consumeStream(job_id);
-      } catch (_) { /* no job, stay on add view */ }
-    })();
+        if (r.ok) {
+          const { job_id } = await r.json();
+          if (job_id) {
+            rememberJob(job_id);
+            consumeStream(job_id);
+            return;
+          }
+        }
+      } catch (_) { /* ignore */ }
+
+      // No active run — first-time visit with no projects goes to Projects view.
+      if (!allProjects.length) showView('projects');
+      else showView('add');
+    }
+    bootstrap();
 
     function handleEvent(ev) {
       switch (ev.type) {

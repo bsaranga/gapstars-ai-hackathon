@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -31,6 +32,7 @@ def dashboard() -> FileResponse:
 
 class TriageRequest(BaseModel):
     bug_markdown: str
+    project_id: int | None = None
 
 
 @app.post("/triage")
@@ -40,9 +42,69 @@ async def triage_start(req: TriageRequest) -> dict:
     Both UI views subscribe to the same job via `/triage/{job_id}/stream`,
     so switching between `/` and `/dashboard` mid-run shows the same state.
     """
+    if req.project_id is not None and db.get_project(req.project_id) is None:
+        raise HTTPException(status_code=404, detail="unknown project_id")
     deps = load_all()
-    job = store.start(req.bug_markdown, deps)
-    return {"job_id": job.id}
+    job = store.start(req.bug_markdown, deps, project_id=req.project_id)
+    return {"job_id": job.id, "project_id": req.project_id}
+
+
+class ProjectCreate(BaseModel):
+    name: str
+    key: str | None = None
+    description: str | None = None
+
+
+@app.get("/projects")
+def projects_list() -> dict:
+    return {"projects": db.list_projects()}
+
+
+@app.post("/projects")
+def projects_create(p: ProjectCreate) -> dict:
+    name = (p.name or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="name is required")
+    try:
+        pid = db.create_project(name, p.key, p.description)
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=409, detail="project name already exists")
+    return db.get_project(pid) or {}
+
+
+class IssueCreate(BaseModel):
+    project_id: int
+    job_id: str
+
+
+@app.post("/issues")
+def issues_create(req: IssueCreate) -> dict:
+    if db.get_project(req.project_id) is None:
+        raise HTTPException(status_code=404, detail="unknown project_id")
+    run = db.get_run(req.job_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="unknown job_id")
+    final = next(
+        (
+            e.get("final")
+            for e in run.get("events", [])
+            if e.get("type") == "pipeline_done"
+        ),
+        None,
+    )
+    if not final or final.get("status") != "Triaged":
+        raise HTTPException(
+            status_code=400, detail="run did not complete triage successfully"
+        )
+    iid = db.create_issue(req.project_id, req.job_id, final)
+    return {"id": iid}
+
+
+@app.get("/issues")
+def issues_list(project_id: int) -> dict:
+    if db.get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail="unknown project_id")
+    return {"issues": db.list_issues(project_id)}
 
 
 @app.get("/triage/current")
