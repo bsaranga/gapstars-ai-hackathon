@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bug Triage Results | IssueTrack</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    .severity-strip {
+      width: 4px;
+      height: 100%;
+      position: absolute;
+      left: 0;
+      top: 0;
+    }
+  </style>
+</head>
+
+<body class="min-h-screen bg-slate-50 text-slate-900">
+
+  <!-- Top navigation -->
+  <nav aria-label="Primary" class="fixed top-0 inset-x-0 z-50 h-14 w-full border-b border-slate-200 bg-white">
+    <div class="mx-auto flex h-full w-full max-w-7xl items-center justify-between px-6">
+      <div class="flex items-center gap-6">
+        <span class="text-xl font-extrabold tracking-tight text-blue-700">IssueTrack</span>
+        <div class="hidden md:flex h-full items-center gap-4">
+          <a href="#" class="flex h-full items-center px-2 text-sm font-semibold text-slate-600 hover:text-slate-900 transition">Projects</a>
+          <a href="#" class="flex h-full items-center px-2 text-sm font-semibold text-blue-700 border-b-2 border-blue-700">Issues</a>
+          <a href="#" class="flex h-full items-center px-2 text-sm font-semibold text-slate-600 hover:text-slate-900 transition">Boards</a>
+          <a href="#" class="flex h-full items-center px-2 text-sm font-semibold text-slate-600 hover:text-slate-900 transition">Dashboards</a>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-4">
+        <button class="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 active:scale-[0.98] transition">
+          Create
+        </button>
+        <div class="flex items-center gap-2 text-slate-500">
+          <span class="material-symbols-outlined cursor-pointer rounded-full p-1.5 hover:bg-slate-100 transition">notifications</span>
+          <span class="material-symbols-outlined cursor-pointer rounded-full p-1.5 hover:bg-slate-100 transition">settings</span>
+          <span class="material-symbols-outlined cursor-pointer rounded-full p-1.5 hover:bg-slate-100 transition">help</span>
+        </div>
+        <img
+          src="https://lh3.googleusercontent.com/aida-public/AB6AXuDmBg6U2euMvlfUB8gjwWf6UM8Cz5snvrSXKsyxGANm9yxzKQOwJa-RKJrxmiw_-Zafg9KoGwLbBRNpGDA8rcaW8kzjE71qj_IZZNwiXcCfbseNp1_YC0AGaC7Kotp7bOvIjAHSXjdJqf9Fanwo_I_Brpdz5KXON4KMHknYZWlr8PPbnLecEn6H0sUxerT3XkDidwLOKN7jKc1-pa5fS1XXdDdUX7R1hOubmkJldhs0gYcYRQHO4eXS5UVAmCCaX2W_R1UUJ_UDb_Ri"
+          alt="User profile"
+          class="h-8 w-8 rounded-full border border-slate-200">
+      </div>
+    </div>
+  </nav>
+
+  <!-- Side navigation -->
+  <aside class="fixed left-0 top-14 hidden h-[calc(100vh-3.5rem)] w-64 flex-col gap-1 border-r border-slate-200 bg-white p-4 md:flex">
+    <div class="mb-6 flex items-center gap-3">
+      <div class="flex h-10 w-10 items-center justify-center rounded-md bg-blue-600 text-white">
+        <span class="material-symbols-outlined">cloud</span>
+      </div>
+      <div>
+        <h3 class="text-base font-semibold leading-tight">Cloud Infrastructure</h3>
+        <p class="text-xs text-slate-500">Software Project</p>
+      </div>
+    </div>
+
+    <nav aria-label="Project sections" class="flex flex-1 flex-col gap-1">
+      <a href="#" class="flex items-center gap-3 rounded-md p-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 transition">
+        <span class="material-symbols-outlined">list</span>
+        <span>Backlog</span>
+      </a>
+      <a href="#" class="flex items-center gap-3 rounded-md bg-blue-100 p-2 text-sm font-bold text-blue-800 transition">
+        <span class="material-symbols-outlined">bug_report</span>
+        <span>Issues</span>
+      </a>
+    </nav>
+
+    <button class="mt-auto flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-semibold hover:bg-slate-100 active:scale-[0.98] transition">
+      <span class="material-symbols-outlined">add</span>
+      New Issue
+    </button>
+  </aside>
+
+  <!-- Main canvas -->
+  <main class="min-h-screen pt-14 md:ml-64">
+    <div class="mx-auto max-w-5xl p-6">
+
+      <!-- Page header -->
+      <header class="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+        <div>
+          <span class="mb-2 inline-block rounded bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700">ISSUE-402</span>
+          <h1 class="text-3xl font-semibold tracking-tight text-slate-900">Bug Triage Results</h1>
+          <p class="mt-1 text-sm text-slate-500">AI-powered analysis complete. Review and confirm the generated issue details.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="rounded-md bg-slate-100 px-6 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-200 active:scale-[0.98] transition">
+            Edit Details
+          </button>
+          <button class="rounded-md bg-blue-600 px-6 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 hover:shadow-md active:scale-[0.98] transition">
+            Confirm &amp; Create Issue
+          </button>
+        </div>
+      </header>
+
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-12">
+
+        <!-- Main column -->
+        <div class="space-y-6 md:col-span-8">
+
+          <!-- Bug summary -->
+          <section class="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-6">
+            <div class="severity-strip bg-red-600"></div>
+            <div class="mb-2 flex items-start justify-between">
+              <span class="rounded bg-blue-100 px-2 py-1 text-xs font-semibold uppercase tracking-wider text-blue-700">Bug Summary</span>
+              <span class="text-xs text-slate-500">Analyzed 2m ago</span>
+            </div>
+            <h2 class="mb-4 text-3xl font-bold leading-tight text-slate-900">
+              Infinite redirect loop on OAuth callback for regional AWS instances
+            </h2>
+            <p class="text-base leading-relaxed text-slate-600">
+              The authentication service fails to handshake correctly when the user is routed through the 'us-west-2' gateway, resulting in a 302 loop between the login portal and the regional balancer.
+            </p>
+          </section>
+
+          <!-- Reproduction steps -->
+          <section class="rounded-xl border border-slate-200 bg-white p-6">
+            <h3 class="mb-6 flex items-center gap-2 text-base font-semibold text-slate-900">
+              <span class="material-symbols-outlined text-blue-600">rebase_edit</span>
+              Suggested Reproduction Steps
+            </h3>
+            <div class="space-y-4">
+              <div class="flex gap-4 rounded-lg border border-slate-100 bg-slate-50 p-4">
+                <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 font-bold text-white">1</div>
+                <div>
+                  <h4 class="mb-1 text-xs font-bold">Configure VPN</h4>
+                  <p class="text-sm text-slate-600">Route traffic through a US-West-2 exit node to simulate regional access.</p>
+                </div>
+              </div>
+              <div class="flex gap-4 rounded-lg border border-slate-100 bg-slate-50 p-4">
+                <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 font-bold text-white">2</div>
+                <div>
+                  <h4 class="mb-1 text-xs font-bold">Initiate OAuth</h4>
+                  <p class="text-sm text-slate-600">Navigate to /auth/login and select 'AWS Single Sign-On' as the provider.</p>
+                </div>
+              </div>
+              <div class="flex gap-4 rounded-lg border border-slate-100 bg-slate-50 p-4">
+                <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 font-bold text-white">3</div>
+                <div>
+                  <h4 class="mb-1 text-xs font-bold">Monitor Network</h4>
+                  <p class="text-sm text-slate-600">Open DevTools and watch for cyclic 302 responses between domains.</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Expected results -->
+          <section class="rounded-xl border border-slate-200 bg-white p-6">
+            <h3 class="mb-4 text-base font-semibold text-slate-900">Expected Results</h3>
+            <div class="rounded-lg border border-slate-100 bg-slate-50 p-4 text-sm text-slate-600">
+              User should be redirected to the regional AWS console dashboard after successful authentication, with a valid session token corresponding to the 'us-west-2' region.
+            </div>
+          </section>
+
+          <!-- Actual results -->
+          <section class="rounded-xl border border-slate-200 bg-white p-6">
+            <h3 class="mb-4 text-base font-semibold text-slate-900">Actual Results</h3>
+            <div class="overflow-x-auto rounded-lg border border-red-200 bg-slate-100 p-4 font-mono text-sm text-red-700">
+              <code>
+                [14:22:01] GET https://auth.acme.com/callback?code=... (302) <br>
+                [14:22:01] GET https://us-west-2.console.acme.com/login (302) <br>
+                [14:22:02] GET https://auth.acme.com/callback?code=... (302) <br>
+                ... (Loop detected after 15 redirections)
+              </code>
+            </div>
+          </section>
+
+          <!-- Triage recommendation -->
+          <section class="relative overflow-hidden rounded-xl bg-blue-600 p-6 text-white shadow-lg">
+            <div class="pointer-events-none absolute right-0 top-0 p-6 opacity-10">
+              <span class="material-symbols-outlined text-[120px]">auto_awesome</span>
+            </div>
+            <div class="relative z-10">
+              <h3 class="mb-2 flex items-center gap-2 text-lg font-semibold">
+                <span class="material-symbols-outlined">smart_toy</span>
+                Triage Recommendation
+              </h3>
+              <p class="text-sm leading-relaxed text-blue-50">
+                This issue should be treated as a <strong class="text-white">Blocker</strong> for the upcoming regional expansion. The root cause appears to be a mismatch in the callback URL whitelist parameters specific to AWS edge locations. Recommended fix involves updating the <code class="rounded bg-blue-700/50 px-1">auth-config.yaml</code> to support wildcards for regional subdomains.
+              </p>
+            </div>
+          </section>
+
+        </div>
+
+        <!-- Sidebar -->
+        <div class="space-y-4 md:col-span-4">
+
+          <!-- Triage metadata -->
+          <section class="rounded-xl border border-slate-200 bg-white p-6">
+            <h3 class="mb-4 text-xs font-semibold uppercase text-slate-500">Triage Metadata</h3>
+            <div class="space-y-4">
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-slate-600">Severity</span>
+                <span class="flex items-center gap-1 rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
+                  <span class="material-symbols-outlined text-[14px]">error</span>
+                  High
+                </span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-slate-600">Priority</span>
+                <span class="rounded-full bg-orange-600 px-3 py-1 text-xs font-semibold text-white">P1</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-slate-600">Confidence</span>
+                <span class="font-bold text-slate-900">94%</span>
+              </div>
+            </div>
+
+            <!-- Suggested team -->
+            <div class="mt-6 border-t border-slate-200 pt-4">
+              <p class="mb-4 text-xs text-slate-500">Suggested Team &amp; Lead</p>
+              <div class="flex items-center gap-3 rounded-lg border border-slate-100 bg-slate-50 p-2">
+                <img
+                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuDtXv9lYkY7S9b5ZpW5lW5lW5lW5lW5lW5lW5lW5lW5lW5lW5lW5lW5lW5lW5lW5lW5lW5lW5lW5lW5lW5lW5lW5lW5lW5lW5lW5lW=s160"
+                  alt="Al Ri"
+                  class="h-10 w-10 rounded-full object-cover ring-2 ring-blue-200">
+                <div class="flex flex-col">
+                  <span class="text-base font-semibold leading-none text-slate-900">Al Ri</span>
+                  <div class="mt-1 flex items-center gap-1 text-blue-600">
+                    <span class="material-symbols-outlined text-[14px]">groups</span>
+                    <span class="text-xs font-semibold uppercase">Frontend Squad</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Missing info -->
+          <section class="rounded-xl border border-amber-300 bg-amber-50 p-6 text-amber-900">
+            <h3 class="mb-2 flex items-center gap-2 text-xs font-semibold uppercase">
+              <span class="material-symbols-outlined text-[18px]">warning</span>
+              Missing Information
+            </h3>
+            <ul class="space-y-2 text-sm">
+              <li class="flex items-start gap-2">
+                <span class="material-symbols-outlined mt-1 text-[8px]">circle</span>
+                Browser version logs were not attached.
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="material-symbols-outlined mt-1 text-[8px]">circle</span>
+                Specific user IDs affected are unknown.
+              </li>
+            </ul>
+          </section>
+
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    document.querySelectorAll('button, [class*="cursor-pointer"]').forEach((el) => {
+      el.addEventListener('mousedown', () => el.classList.add('scale-[0.97]'));
+      el.addEventListener('mouseup',   () => el.classList.remove('scale-[0.97]'));
+      el.addEventListener('mouseleave', () => el.classList.remove('scale-[0.97]'));
+    });
+  </script>
+
+</body>
+</html>
