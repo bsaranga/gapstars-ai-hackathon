@@ -228,6 +228,11 @@ Description...
               d="M 388 577 L 333 577" marker-end="url(#ah-idle)" />
         <path id="lk-triage-artifact" class="link"
               d="M 240 600 L 240 647" marker-end="url(#ah-idle)" />
+        <!-- artifact ↔ rules tool (two-way, dashed) -->
+        <path id="lk-artifact-rules"  class="link dashed muted"
+              d="M 330 673 L 388 673" marker-end="url(#ah-idle)" />
+        <path id="lk-rules-artifact"  class="link dashed muted"
+              d="M 388 697 L 333 697" marker-end="url(#ah-idle)" />
       </svg>
 
       <!-- Node layer (HTML, same pixel space as the SVG above).
@@ -290,6 +295,14 @@ Description...
         <div class="title">artifact</div>
         <div class="meta" id="m-artifact">idle</div>
       </div>
+
+      <div id="n-rules-tool" class="node tools idle clickable"
+           style="left:480px; top:685px;">
+        <div class="label">tool</div>
+        <div class="tool" id="tool-rules">get_triage_rules</div>
+        <div class="meta" id="m-rules-tool" style="text-align:left;
+             margin-top: 6px;">awaiting rule</div>
+      </div>
     </div>
 
     <!-- Final report (rendered after pipeline_done) -->
@@ -313,7 +326,7 @@ const $bug = $('bug'), $submit = $('submit'),
 // ------- per-node captured data -------
 const data = {};   // node id -> { input, output, error, status, meta, extra }
 const NODE_IDS = ['input','parser','analyzer','gate','short','rule',
-                  'triage','tools','artifact'];
+                  'triage','tools','artifact','rules-tool'];
 function emptyEntry() { return { input: null, output: null, error: null,
   status: 'idle', meta: '', extra: null }; }
 function resetData() {
@@ -371,6 +384,7 @@ const NODE_TITLES = {
   triage:   'Agent · triage',
   tools:    'Tools · used by triage',
   artifact: 'Agent · artifact',
+  'rules-tool': 'Tool · used by artifact',
 };
 const NODE_DESCRIPTIONS = {
   input:    'The markdown pasted into the form. Sent verbatim to the parser agent.',
@@ -381,7 +395,8 @@ const NODE_DESCRIPTIONS = {
   rule:     'Pure rule. Picks severity / priority via the §5.3 table and the owner team via teams.json.',
   triage:   'LLM agent. Picks an assignee by calling get_team_members + get_developer_history. Budget: 1 + 3 tool calls.',
   tools:    'Pure-read tool functions over teams.json and tasks.json. Invoked by the triage agent.',
-  artifact: 'LLM agent. Produces Jira ticket, test cases, dup-check query, and Slack handoff note.',
+  artifact: 'LLM agent. Calls get_triage_rules to confirm the severity / priority rule that fired, then produces Jira ticket, test cases, dup-check query, and Slack handoff note.',
+  'rules-tool': 'Pure-read tool function over rules.json. Returns the full severity / priority rule table so the artifact agent can cite the rule that the orchestrator applied.',
 };
 
 function selectNode(id) {
@@ -437,14 +452,21 @@ NODE_IDS.forEach(id => {
 // ------- event-stream handling -------
 function resetGraph() {
   resetData();
-  ['parser','analyzer','gate','short','rule','triage','tools','artifact']
-    .forEach(id => setNode(id, 'idle', id === 'rule' ? 'awaiting gate' : 'idle'));
+  ['parser','analyzer','gate','short','rule','triage','tools','artifact','rules-tool']
+    .forEach(id => {
+      const meta = id === 'rule'       ? 'awaiting gate'
+                : id === 'rules-tool'  ? 'awaiting rule'
+                : 'idle';
+      setNode(id, 'idle', meta);
+    });
   ['lk-input-parser','lk-parser-analyzer','lk-analyzer-gate','lk-gate-rule',
    'lk-rule-triage','lk-triage-artifact'].forEach(id => setLink(id, null));
-  setLink('lk-gate-short',   'muted');
-  setLink('lk-triage-tools', 'muted');
-  setLink('lk-tools-triage', 'muted');
-  ['tool-team','tool-hist'].forEach(t => {
+  setLink('lk-gate-short',     'muted');
+  setLink('lk-triage-tools',   'muted');
+  setLink('lk-tools-triage',   'muted');
+  setLink('lk-artifact-rules', 'muted');
+  setLink('lk-rules-artifact', 'muted');
+  ['tool-team','tool-hist','tool-rules'].forEach(t => {
     $(t).classList.remove('active', 'used');
   });
   $outputs.innerHTML = '';
@@ -467,6 +489,12 @@ function handleEvent(ev) {
         $('tool-team').classList.add('active');
         $('tool-hist').classList.add('active');
       }
+      if (ev.agent === 'artifact') {
+        setLink('lk-artifact-rules', 'flowing');
+        setLink('lk-rules-artifact', 'flowing');
+        $('tool-rules').classList.add('active');
+        setNode('rules-tool', 'running', 'looking up rule…');
+      }
     }
   } else if (ev.type === 'done') {
     const id = NODE_FOR_AGENT[ev.agent];
@@ -484,11 +512,27 @@ function handleEvent(ev) {
         $('tool-hist').classList.add('used');
         setLink('lk-triage-tools', 'done');
         setLink('lk-tools-triage', 'done');
-        // surface tool results on the tools node for inspection
         data.tools.status = 'done';
         data.tools.output = {
           note: 'The actual tool call I/O is not exposed by the event stream; '
               + 'see the triage agent\'s output for the choice it made.',
+        };
+      }
+      if (ev.agent === 'artifact') {
+        $('tool-rules').classList.remove('active');
+        $('tool-rules').classList.add('used');
+        setLink('lk-artifact-rules', 'done');
+        setLink('lk-rules-artifact', 'done');
+        const chosen = data.rule.output || {};
+        setNode('rules-tool', 'done',
+          `cited: ${chosen.rule_id || '?'}`);
+        data['rules-tool'].output = {
+          note: 'Tool returned the full rules.json table; the artifact '
+              + 'agent looked up the entry below to cite in its handoff_note.',
+          cited_rule_id: chosen.rule_id,
+          severity: chosen.severity,
+          priority: chosen.priority,
+          rule_description: chosen.rule_applied,
         };
       }
     }
@@ -516,12 +560,23 @@ function handleEvent(ev) {
     }
   } else if (ev.type === 'rule') {
     data.rule.output = {
-      severity: ev.severity, priority: ev.priority,
-      rule_applied: ev.rule_applied, team: ev.team,
+      rule_id: ev.rule_id,
+      severity: ev.severity,
+      priority: ev.priority,
+      rule_applied: ev.rule_applied,
+      team: ev.team,
     };
     setNode('rule', 'done',
-      `${ev.severity} / ${ev.priority} — ${ev.team}`);
+      `${ev.severity} / ${ev.priority} · ${ev.rule_id || ev.team}`);
     setLink('lk-gate-rule', 'done');
+    // pre-stage the rules-tool node so users see what the artifact agent
+    // will look up
+    data['rules-tool'].extra = {
+      will_lookup: ev.rule_id,
+      severity: ev.severity,
+      priority: ev.priority,
+    };
+    setNode('rules-tool', 'idle', `will look up: ${ev.rule_id || '?'}`);
   } else if (ev.type === 'pipeline_done') {
     renderFinal(ev.final);
   } else if (ev.type === 'pipeline_failed') {

@@ -308,3 +308,121 @@ class TasksConfig(BaseModel):
                     f"task {task.id}: assignee_id {task.assignee_id!r} "
                     "not found in any team's developers"
                 )
+
+
+# ---------- Config: rules.json (severity / priority rule table) ----------
+
+
+class RuleMatcher(BaseModel):
+    """Conditions a bug must satisfy for a rule to fire.
+
+    All listed conditions are ANDed; conditions whose list is empty are
+    skipped. Keyword checks are substring matches against a normalised
+    lowercase haystack built from the bug title, description,
+    actual_result, the analyzer's summary, and extracted_errors.
+    """
+
+    any_keywords: list[str] = Field(
+        default_factory=list,
+        description="Match if ANY of these substrings appear in the bug text.",
+    )
+    all_keywords: list[str] = Field(
+        default_factory=list,
+        description="Match only if ALL of these substrings appear.",
+    )
+    exclude_keywords: list[str] = Field(
+        default_factory=list,
+        description="Match only if NONE of these substrings appear.",
+    )
+    affected_areas: list[AffectedArea] = Field(
+        default_factory=list,
+        description="Match if the analyzer's affected_area is in this list.",
+    )
+    environment_substrings: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Match only if at least one of these substrings appears in the "
+            "bug's environment.app_version (or anywhere in the haystack). "
+            "Typical use: gate a rule to production-only reports."
+        ),
+    )
+
+    def is_empty(self) -> bool:
+        """A rule with no conditions matches everything (the catch-all default)."""
+        return not (
+            self.any_keywords
+            or self.all_keywords
+            or self.exclude_keywords
+            or self.affected_areas
+            or self.environment_substrings
+        )
+
+
+class TriageRule(BaseModel):
+    """A single severity/priority rule. Evaluated in order; first match wins."""
+
+    id: str = Field(pattern=r"^[a-z0-9][a-z0-9-]*$")
+    description: str
+    severity: Severity
+    priority: Priority
+    match: RuleMatcher = Field(default_factory=RuleMatcher)
+    notes: str | None = None
+
+
+class TriageRuleSummary(BaseModel):
+    """Returned by the `get_triage_rules` tool — same shape as TriageRule.
+
+    Withholding nothing: the agent benefits from seeing the matchers so it
+    can explain *why* the orchestrator picked the rule that fired.
+    """
+
+    id: str
+    description: str
+    severity: Severity
+    priority: Priority
+    match: RuleMatcher
+    notes: str | None = None
+
+
+class TriageRulesConfig(BaseModel):
+    """Severity / priority rule table loaded from `config/rules.json`."""
+
+    version: Literal[1] = 1
+    rules: list[TriageRule] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _unique_ids(self) -> TriageRulesConfig:
+        seen: set[str] = set()
+        for r in self.rules:
+            if r.id in seen:
+                raise ValueError(f"duplicate rule id: {r.id}")
+            seen.add(r.id)
+        return self
+
+    @model_validator(mode="after")
+    def _ends_with_default(self) -> TriageRulesConfig:
+        """The last rule must be a catch-all (empty match) so every bug
+        gets a verdict. This is enforced at load time so config edits
+        can't silently leave a hole.
+        """
+        last = self.rules[-1]
+        if not last.match.is_empty():
+            raise ValueError(
+                f"the last rule (id={last.id!r}) must have an empty `match` "
+                "block so it acts as the default catch-all. Move it to the "
+                "end of the list, or add a default-* rule after it."
+            )
+        # And no other rule may be a catch-all (would shadow later rules).
+        for r in self.rules[:-1]:
+            if r.match.is_empty():
+                raise ValueError(
+                    f"rule {r.id!r} has an empty `match` block but is not "
+                    "the last rule — it would shadow every rule after it."
+                )
+        return self
+
+    def get_rule(self, rule_id: str) -> TriageRule | None:
+        for r in self.rules:
+            if r.id == rule_id:
+                return r
+        return None

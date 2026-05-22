@@ -69,7 +69,7 @@ async def triage(raw_markdown: str, deps: TriageDeps | None = None) -> TriageRes
             bug=bug, analysis=analysis, decision=None, artifacts=None, final=final
         )
 
-    verdict = classify(bug, analysis)
+    verdict = classify(bug, analysis, deps.rules)
     team = select_team(analysis, deps.teams)
 
     triage_input = json.dumps(
@@ -92,6 +92,7 @@ async def triage(raw_markdown: str, deps: TriageDeps | None = None) -> TriageRes
             "analysis": analysis.model_dump(),
             "severity": verdict.severity,
             "priority": verdict.priority,
+            "rule_id": verdict.rule_id,
             "team_name": team.name,
             "jira_project": team.jira_project,
             "slack_channel": team.slack_channel,
@@ -101,7 +102,7 @@ async def triage(raw_markdown: str, deps: TriageDeps | None = None) -> TriageRes
             "notify": [n.model_dump() for n in notify],
         }
     )
-    artifact_result = await artifact_agent.run(artifact_input)
+    artifact_result = await artifact_agent.run(artifact_input, deps=deps)
     artifacts: ArtifactBundle = artifact_result.output
 
     final = FinalReport(
@@ -116,7 +117,10 @@ async def triage(raw_markdown: str, deps: TriageDeps | None = None) -> TriageRes
         suggested_assignee=decision.suggested_assignee,
         notify=notify,
         triage_recommendation=decision.triage_recommendation,
-        rule_applied=f"{verdict.rule_applied} → {verdict.severity} / {verdict.priority}",
+        rule_applied=(
+            f"{verdict.rule_id}: {verdict.rule_applied} → "
+            f"{verdict.severity} / {verdict.priority}"
+        ),
         artifacts=artifacts,
     )
     return TriageResult(

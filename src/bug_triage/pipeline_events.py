@@ -120,13 +120,14 @@ async def triage_events(
                 await queue.put({"type": "pipeline_done", "final": final.model_dump()})
                 return
 
-            verdict = classify(bug, analysis)
+            verdict = classify(bug, analysis, deps.rules)
             team = select_team(analysis, deps.teams)
             await queue.put(
                 {
                     "type": "rule",
                     "severity": verdict.severity,
                     "priority": verdict.priority,
+                    "rule_id": verdict.rule_id,
                     "rule_applied": verdict.rule_applied,
                     "team": team.name,
                 }
@@ -156,6 +157,7 @@ async def triage_events(
                     "analysis": analysis.model_dump(),
                     "severity": verdict.severity,
                     "priority": verdict.priority,
+                    "rule_id": verdict.rule_id,
                     "team_name": team.name,
                     "jira_project": team.jira_project,
                     "slack_channel": team.slack_channel,
@@ -164,6 +166,7 @@ async def triage_events(
                     ),
                     "notify": [n.model_dump() for n in notify],
                 },
+                deps=deps,
             )
 
             final = FinalReport(
@@ -179,7 +182,10 @@ async def triage_events(
                 suggested_assignee=decision.suggested_assignee,
                 notify=notify,
                 triage_recommendation=decision.triage_recommendation,
-                rule_applied=f"{verdict.rule_applied} → {verdict.severity} / {verdict.priority}",
+                rule_applied=(
+                    f"{verdict.rule_id}: {verdict.rule_applied} → "
+                    f"{verdict.severity} / {verdict.priority}"
+                ),
                 artifacts=artifacts,
             )
             await queue.put({"type": "pipeline_done", "final": final.model_dump()})

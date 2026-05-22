@@ -2,21 +2,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .models import AnalysisOutput, BugReport, Priority, Severity, Team, TeamsConfig
-
-_OUTAGE_KEYWORDS = (
-    "outage",
-    "down",
-    "cannot access",
-    "all users",
-    "data loss",
-    "security breach",
-    " 500",
-    " 502",
-    " 503",
+from .models import (
+    AnalysisOutput,
+    BugReport,
+    Priority,
+    Severity,
+    Team,
+    TeamsConfig,
+    TriageRule,
+    TriageRulesConfig,
 )
-_COSMETIC_KEYWORDS = ("alignment", "color", "typo", "padding", "spacing")
-_FUNCTIONAL_VERBS = ("cannot", "fails", "crashes", "broken", "error")
 
 
 @dataclass(frozen=True)
@@ -24,44 +19,73 @@ class RuleVerdict:
     severity: Severity
     priority: Priority
     rule_applied: str
+    rule_id: str
 
 
 def _haystack(bug: BugReport, analysis: AnalysisOutput) -> str:
-    parts = [
-        bug.title,
-        bug.description,
-        bug.actual_result or "",
-        analysis.summary,
-        " ".join(analysis.extracted_errors),
-    ]
-    return " ".join(parts).lower()
+    """Lowercased text used for keyword matching."""
+    return " ".join(
+        [
+            bug.title,
+            bug.description,
+            bug.actual_result or "",
+            analysis.summary,
+            " ".join(analysis.extracted_errors),
+        ]
+    ).lower()
 
 
-def _is_production_outage(bug: BugReport, analysis: AnalysisOutput) -> bool:
+def _env_haystack(bug: BugReport, text: str) -> str:
+    env = bug.environment
+    return " ".join(
+        [
+            env.app_version or "",
+            env.os or "",
+            env.browser or "",
+            env.device or "",
+            env.user_role or "",
+            text,
+        ]
+    ).lower()
+
+
+def _matches(rule: TriageRule, bug: BugReport, analysis: AnalysisOutput) -> bool:
+    m = rule.match
     text = _haystack(bug, analysis)
-    has_keyword = any(k in text for k in _OUTAGE_KEYWORDS)
-    in_prod = (bug.environment.app_version or "").lower().startswith(
-        ("prod", "production")
-    ) or "production" in text
-    return has_keyword and in_prod
+    if m.any_keywords and not any(k.lower() in text for k in m.any_keywords):
+        return False
+    if m.all_keywords and not all(k.lower() in text for k in m.all_keywords):
+        return False
+    if m.exclude_keywords and any(k.lower() in text for k in m.exclude_keywords):
+        return False
+    if m.affected_areas and analysis.affected_area not in m.affected_areas:
+        return False
+    if m.environment_substrings:
+        env_text = _env_haystack(bug, text)
+        if not any(s.lower() in env_text for s in m.environment_substrings):
+            return False
+    return True
 
 
-def _is_cosmetic(bug: BugReport, analysis: AnalysisOutput) -> bool:
-    text = _haystack(bug, analysis)
-    has_cosmetic = any(k in text for k in _COSMETIC_KEYWORDS)
-    has_functional = any(v in text for v in _FUNCTIONAL_VERBS)
-    return has_cosmetic and not has_functional
+def classify(
+    bug: BugReport, analysis: AnalysisOutput, rules: TriageRulesConfig
+) -> RuleVerdict:
+    """Apply the rule table in order; first match wins.
 
-
-def classify(bug: BugReport, analysis: AnalysisOutput) -> RuleVerdict:
-    """Deterministic severity/priority from §5.3. Run before any LLM call."""
-    if _is_production_outage(bug, analysis):
-        return RuleVerdict("Critical", "P0", "Production outage / data loss / security")
-    if analysis.affected_area in ("auth", "payments"):
-        return RuleVerdict("High", "P1", "Auth / Payment issue")
-    if _is_cosmetic(bug, analysis):
-        return RuleVerdict("Low", "P3", "UI cosmetic")
-    return RuleVerdict("Medium", "P2", "Default (workaround likely exists)")
+    The rule table's loader guarantees a catch-all default at the end, so
+    this function always returns a verdict.
+    """
+    for r in rules.rules:
+        if _matches(r, bug, analysis):
+            return RuleVerdict(
+                severity=r.severity,
+                priority=r.priority,
+                rule_applied=r.description,
+                rule_id=r.id,
+            )
+    raise RuntimeError(
+        "no rule matched — TriageRulesConfig validator should have prevented this"
+    )
 
 
 def select_team(analysis: AnalysisOutput, teams: TeamsConfig) -> Team:

@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "production-outage",
+      "description": "Production outage, data loss, or security breach — pages on-call",
+      "severity": "Critical",
+      "priority": "P0",
+      "match": {
+        "any_keywords": [
+          "outage",
+          "down",
+          "cannot access",
+          "all users",
+          "data loss",
+          "security breach",
+          " 500",
+          " 502",
+          " 503"
+        ],
+        "environment_substrings": ["production", "prod"]
+      },
+      "notes": "Highest precedence — evaluated before any area-based rule. Leading spaces in HTTP code keywords avoid false matches on version strings like 'v500'."
+    },
+    {
+      "id": "auth-broken",
+      "description": "Authentication functionality broken (login, MFA, SSO, tokens)",
+      "severity": "High",
+      "priority": "P1",
+      "match": {
+        "affected_areas": ["auth"]
+      },
+      "notes": "Splits auth from payments so the rule_applied label is precise. Both still resolve to High / P1."
+    },
+    {
+      "id": "payments-broken",
+      "description": "Payment functionality broken (checkout, refunds, billing)",
+      "severity": "High",
+      "priority": "P1",
+      "match": {
+        "affected_areas": ["payments"]
+      },
+      "notes": "Revenue-impacting; on-call ladder cares about these the most after outages."
+    },
+    {
+      "id": "cosmetic",
+      "description": "UI cosmetic issue (alignment, color, typo, padding) with no functional failure",
+      "severity": "Low",
+      "priority": "P3",
+      "match": {
+        "any_keywords": ["alignment", "color", "colour", "typo", "padding", "spacing"],
+        "exclude_keywords": ["cannot", "fails", "crashes", "broken", "error"]
+      },
+      "notes": "The exclude list demotes reports that mention cosmetic terms but describe a real functional failure (e.g. 'button alignment is broken AND clicking it fails')."
+    },
+    {
+      "id": "performance-regression",
+      "description": "Performance regression — latency, memory, bundle size",
+      "severity": "Medium",
+      "priority": "P2",
+      "match": {
+        "affected_areas": ["performance"]
+      },
+      "notes": "Not in the current hard-coded ruleset but a natural extension; here so the table demonstrates how a new area-based rule lands."
+    },
+    {
+      "id": "default-medium",
+      "description": "Default — workaround likely exists",
+      "severity": "Medium",
+      "priority": "P2",
+      "match": {},
+      "notes": "Catch-all. Must remain LAST in the list — validated at load time."
+    }
+  ]
+}

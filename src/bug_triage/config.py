@@ -12,10 +12,13 @@ from .models import (
     TaskSummary,
     TasksConfig,
     TeamsConfig,
+    TriageRuleSummary,
+    TriageRulesConfig,
 )
 
 _DEFAULT_TEAMS_PATH = Path("config/teams.json")
 _DEFAULT_TASKS_PATH = Path("config/tasks.json")
+_DEFAULT_RULES_PATH = Path("config/rules.json")
 
 
 def _resolve(env: str, default: Path) -> Path:
@@ -31,6 +34,11 @@ def load_teams(path: Path | None = None) -> TeamsConfig:
 def load_tasks(path: Path | None = None) -> TasksConfig:
     p = path or _resolve("BUG_TRIAGE_TASKS_FILE", _DEFAULT_TASKS_PATH)
     return TasksConfig.model_validate_json(p.read_text(encoding="utf-8"))
+
+
+def load_rules(path: Path | None = None) -> TriageRulesConfig:
+    p = path or _resolve("BUG_TRIAGE_RULES_FILE", _DEFAULT_RULES_PATH)
+    return TriageRulesConfig.model_validate_json(p.read_text(encoding="utf-8"))
 
 
 def open_tasks_per_developer(tasks: TasksConfig) -> dict[str, int]:
@@ -51,6 +59,7 @@ class TriageDeps:
 
     teams: TeamsConfig
     tasks: TasksConfig
+    rules: TriageRulesConfig
     open_load: dict[str, int] = field(default_factory=dict)
 
 
@@ -136,14 +145,39 @@ def get_developer_history_impl(
     return [s for _, s in rows[:limit]]
 
 
+def get_triage_rules_impl(deps: TriageDeps) -> list[TriageRuleSummary]:
+    """Return the full severity/priority rule table.
+
+    Pure read. Lets agents look up which rule fired (by id) and cite its
+    description + notes when explaining their decisions.
+    """
+    return [
+        TriageRuleSummary(
+            id=r.id,
+            description=r.description,
+            severity=r.severity,
+            priority=r.priority,
+            match=r.match,
+            notes=r.notes,
+        )
+        for r in deps.rules.rules
+    ]
+
+
 def load_all(
-    teams_path: Path | None = None, tasks_path: Path | None = None
+    teams_path: Path | None = None,
+    tasks_path: Path | None = None,
+    rules_path: Path | None = None,
 ) -> TriageDeps:
     teams = load_teams(teams_path)
     tasks = load_tasks(tasks_path)
+    rules = load_rules(rules_path)
     tasks.cross_validate(teams)
     return TriageDeps(
-        teams=teams, tasks=tasks, open_load=open_tasks_per_developer(tasks)
+        teams=teams,
+        tasks=tasks,
+        rules=rules,
+        open_load=open_tasks_per_developer(tasks),
     )
 
 
@@ -153,8 +187,10 @@ __all__ = [
     "DeveloperNotFound",
     "load_teams",
     "load_tasks",
+    "load_rules",
     "load_all",
     "open_tasks_per_developer",
     "get_team_members_impl",
     "get_developer_history_impl",
+    "get_triage_rules_impl",
 ]
